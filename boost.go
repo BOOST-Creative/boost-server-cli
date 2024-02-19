@@ -273,8 +273,21 @@ func addSSHKey() {
 	huh.NewText().
 		Title("Enter public key").
 		Description("Look in ~/.ssh - file ends in .pub").
+		Validate(func(s string) error {
+			if s == "" {
+				return fmt.Errorf("key cannot be empty")
+			}
+			return nil
+		}).
 		Value(&key).
 		Run()
+
+	// cmd := exec.Command("echo", key, ">>", "/home/"+USER+"/.ssh/authorized_keys")
+	// output, err := cmd.CombinedOutput()
+	err := AppendToFile("/home/"+USER+"/.ssh/authorized_keys", key)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	printInBox("Added SSH key. Have a nice day!")
 }

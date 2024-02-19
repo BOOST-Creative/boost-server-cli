@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -46,4 +48,30 @@ func ReplaceDashWithUnderscore(s string) string {
 
 func ReplaceSpacesWithDashes(s string) string {
 	return strings.ReplaceAll(s, " ", "-")
+}
+
+func AppendToFile(fileName, content string) error {
+	// Open the file in append mode, create it if it doesn't exist
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Create a writer that appends to the file
+	writer := bufio.NewWriter(file)
+
+	// Write the content followed by a newline
+	_, err = fmt.Fprintln(writer, content)
+	if err != nil {
+		return err
+	}
+
+	// Flush the writer to ensure that the content is written to the file
+	err = writer.Flush()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
