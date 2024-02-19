@@ -82,10 +82,8 @@ func runSelection(selection string, chosenSite string) {
 		deleteSite(chosenSite)
 	case "Restart Site":
 		restartSite(chosenSite)
-
 	case "Fix Permissions":
-		fmt.Println("Fixing permissions")
-
+		fixPermissions(chosenSite)
 	case "Add SSH Key":
 		addSSHKey()
 
@@ -219,6 +217,35 @@ func createSite() {
 	)
 
 	printInBox(sb.String())
+}
+
+func fixPermissions(chosenSite string) {
+	// spinner
+	spinner.New().Title("Fixing permissions...").Action(func() {
+		// sudo chown -R nobody: "/home/$CUR_USER/sites/$sitename/wordpress"
+		cmd := exec.Command("sudo", "chown", "-R", "nobody:", "/home/"+USER+"/sites/"+chosenSite+"/wordpress")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
+			os.Exit(1)
+		}
+		// sudo find "/home/$CUR_USER/sites/$sitename" -type d -exec chmod 755 {} +
+		cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite, "-type", "d", "-exec", "chmod", "755", "{}", "+")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
+			os.Exit(1)
+		}
+		// sudo find "/home/$CUR_USER/sites/$sitename/wordpress" -type f -exec chmod 644 {} +
+		cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite+"/wordpress", "-type", "f", "-exec", "chmod", "644", "{}", "+")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
+			os.Exit(1)
+		}
+	}).Run()
+
+	printInBox("Permissions fixed. Have a fantastic day!")
 }
 
 func deleteSite(chosenSite string) {
