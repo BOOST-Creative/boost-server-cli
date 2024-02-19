@@ -14,6 +14,8 @@ import (
 
 var options = huh.NewOptions("Start site", "Stop Site", "Create Site", "Delete Site & Files", "Restart Site", "Fix Permissions", "Add SSH Key", "Container Shell", "Fail2ban Status", "Unban IP", "Whitelist IP", "Prune Docker Images", "MariaDB Upgrade", "Change Site Domain", "DB Search Replace")
 
+var siteChooseOptions = []string{"Stop Site", "Restart Site", "Delete Site & Files", "Fix Permissions", "Container Shell", "Change Site Domain", "DB Search Replace"}
+
 func checkForUpdate() {
 	spinner.New().Title("Checking for update...").Action(func() {
 		time.Sleep(500_000_000)
@@ -24,7 +26,7 @@ func boost() {
 	checkForUpdate()
 
 	var chosenOption string
-	var chosenSite string
+	chosenSite := ""
 
 	form := huh.NewForm(
 
@@ -46,7 +48,14 @@ func boost() {
 					huh.NewOptions(GetDirectoriesInPath("/home/hank")...)...,
 				).
 				Value(&chosenSite),
-		),
+		).WithHideFunc(func() bool {
+			for _, option := range siteChooseOptions {
+				if chosenOption == option {
+					return false
+				}
+			}
+			return true
+		}),
 	)
 
 	err := form.Run()
@@ -148,7 +157,7 @@ func addSSHKey() {
 	var key string
 	huh.NewText().
 		Title("Enter public key").
-		Description("Look in ~/.ssh directory - file ends in .pub").
+		Description("Look in ~/.ssh - file ends in .pub").
 		Value(&key).
 		Run()
 
