@@ -89,8 +89,7 @@ func runSelection(selection string, chosenSite string) {
 	case "Container Shell":
 		containerShell(chosenSite)
 	case "Fail2ban Status":
-		fmt.Println("Fail2ban status")
-
+		fail2banStatus()
 	case "Unban IP":
 		fmt.Println("Unbanning IP")
 
@@ -291,4 +290,12 @@ func containerShell(chosenSite string) {
 	output, err := cmd.CombinedOutput()
 
 	checkError(err, string(output))
+}
+
+func fail2banStatus() {
+	// docker exec fail2ban sh -c "fail2ban-client status | sed -n 's/,//g;s/.*Jail list://p' | xargs -n1 fail2ban-client status"
+	cmd := exec.Command("docker", "exec", "fail2ban", "sh", "-c", "fail2ban-client status | sed -n 's/,//g;s/.*Jail list://p' | xargs -n1 fail2ban-client status")
+	output, err := cmd.CombinedOutput()
+	checkError(err, string(output))
+	fmt.Println(string(output))
 }
