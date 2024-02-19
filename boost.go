@@ -15,9 +15,9 @@ import (
 
 var USER = os.Getenv("USER")
 
-var options = huh.NewOptions("Start Site", "Stop Site", "Create Site", "Delete Site & Files", "Restart Site", "Fix Permissions", "Add SSH Key", "Container Shell", "Fail2ban Status", "Unban IP", "Whitelist IP", "Prune Docker Images", "MariaDB Upgrade", "Change Site Domain", "DB Search Replace")
+var options = huh.NewOptions("Start Site", "Stop Site", "Create Site", "Delete Site & Files", "Restart Site", "Fix Permissions", "Add SSH Key", "Container Shell", "Prune Docker Images", "MariaDB Upgrade", "Change Site Domain", "Database Search Replace", "Fail2ban Status", "Unban IP", "Whitelist IP")
 
-var siteChooseOptions = []string{"Start Site", "Stop Site", "Restart Site", "Delete Site & Files", "Fix Permissions", "Container Shell", "Change Site Domain", "DB Search Replace"}
+var siteChooseOptions = []string{"Start Site", "Stop Site", "Restart Site", "Delete Site & Files", "Fix Permissions", "Container Shell", "Change Site Domain", "Database Search Replace"}
 
 func checkForUpdate() {
 	spinner.New().Title("Checking for update...").Action(func() {
@@ -114,7 +114,7 @@ func runSelection(selection string, chosenSite string) {
 	case "Change Site Domain":
 		fmt.Println("Changing site domain")
 
-	case "DB Search Replace":
+	case "Database Search Replace":
 		fmt.Println("DB search and replace")
 
 	default:
@@ -177,7 +177,7 @@ func createSite() {
 
 	var sb strings.Builder
 	keyword := func(s string) string {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("166")).Render(s)
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(s)
 	}
 	fmt.Fprintf(&sb,
 		"%s\n\nDatabase: %s\nUsername: %s\nPassword: %s\nServer:   %s",
