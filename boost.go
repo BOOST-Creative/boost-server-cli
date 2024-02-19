@@ -124,6 +124,13 @@ func printInBox(content string) {
 	)
 }
 
+func checkError(err error, msg string) {
+	if err != nil {
+		printInBox(fmt.Sprintf("Command failed with error:\n\n%s", strings.TrimSpace(msg)))
+		os.Exit(1)
+	}
+}
+
 func startSite(chosenSite string) {
 	var err error
 	var output []byte
@@ -132,12 +139,8 @@ func startSite(chosenSite string) {
 		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "up", "-d")
 		output, err = cmd.CombinedOutput()
 	}).Run()
-
-	if err != nil {
-		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
-	} else {
-		fmt.Println("Site started. Have a wonderful day!")
-	}
+	checkError(err, string(output))
+	fmt.Println("Site started. Have a wonderful day!")
 }
 
 func stopSite(chosenSite string) {
@@ -150,11 +153,8 @@ func stopSite(chosenSite string) {
 		output, err = cmd.CombinedOutput()
 	}).Run()
 
-	if err != nil {
-		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
-	} else {
-		fmt.Println("Site stopped. Have a wonderful day!")
-	}
+	checkError(err, string(output))
+	fmt.Println("Site stopped. Have a wonderful day!")
 }
 
 func restartSite(chosenSite string) {
@@ -167,11 +167,8 @@ func restartSite(chosenSite string) {
 		output, err = cmd.CombinedOutput()
 	}).Run()
 
-	if err != nil {
-		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
-	} else {
-		fmt.Println("Site Restarted. Have a wonderful day!")
-	}
+	checkError(err, string(output))
+	fmt.Println("Site Restarted. Have a wonderful day!")
 }
 
 func createSite() {
@@ -223,24 +220,15 @@ func fixPermissions(chosenSite string) {
 		// sudo chown -R nobody: "/home/$CUR_USER/sites/$sitename/wordpress"
 		cmd := exec.Command("sudo", "chown", "-R", "nobody:", "/home/"+USER+"/sites/"+chosenSite+"/wordpress")
 		output, err := cmd.CombinedOutput()
-		if err != nil {
-			printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
-			os.Exit(1)
-		}
+		checkError(err, string(output))
 		// sudo find "/home/$CUR_USER/sites/$sitename" -type d -exec chmod 755 {} +
 		cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite, "-type", "d", "-exec", "chmod", "755", "{}", "+")
 		output, err = cmd.CombinedOutput()
-		if err != nil {
-			printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
-			os.Exit(1)
-		}
+		checkError(err, string(output))
 		// sudo find "/home/$CUR_USER/sites/$sitename/wordpress" -type f -exec chmod 644 {} +
 		cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite+"/wordpress", "-type", "f", "-exec", "chmod", "644", "{}", "+")
 		output, err = cmd.CombinedOutput()
-		if err != nil {
-			printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
-			os.Exit(1)
-		}
+		checkError(err, string(output))
 	}).Run()
 
 	printInBox("Permissions fixed. Have a fantastic day!")
@@ -258,9 +246,12 @@ func deleteSite(chosenSite string) {
 
 	if confirm {
 		spinner.New().Title("Deleting site...").Action(func() {
-			exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").Run()
-			exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "rm").Run()
-			exec.Command("sudo", "rm", "-r", "/home/"+USER+"/sites/"+chosenSite).Run()
+			output, err := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").CombinedOutput()
+			checkError(err, string(output))
+			output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "rm").CombinedOutput()
+			checkError(err, string(output))
+			output, err = exec.Command("sudo", "rm", "-r", "/home/"+USER+"/sites/"+chosenSite).CombinedOutput()
+			checkError(err, string(output))
 		}).Run()
 
 		printInBox("Deleted " + chosenSite)
@@ -298,8 +289,6 @@ func containerShell(chosenSite string) {
 	// docker exec -it "$sitename" ash
 	cmd := exec.Command("docker", "exec", "-it", chosenSite, "ash")
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
-		os.Exit(1)
-	}
+
+	checkError(err, string(output))
 }
