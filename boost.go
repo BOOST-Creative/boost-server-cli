@@ -97,8 +97,7 @@ func runSelection(selection string, chosenSite string) {
 	case "Prune Docker Images":
 		pruneDockerImages()
 	case "MariaDB Upgrade":
-		fmt.Println("Upgrading MariaDB")
-
+		mariadbUpgrade()
 	case "Change Site Domain":
 		fmt.Println("Changing site domain")
 
@@ -311,7 +310,7 @@ func unbanIp() {
 		Run()
 
 	script := fmt.Sprintf(`
-		JAILS=$(docker exec fail2ban sh -c "fail2ban-client status | grep 'Jail list'" | sed -E 's/^[^:]+:[ \t]+//' | sed 's/,//g')
+		JAILS=$(docker exec fail2ban sh -c "fail2ban-client status | grep 'Jail list'" | sed -E 's/^[^:]+:[ \t]+//' | sed 's/,//g');
 		for JAIL in $JAILS
 		do
 			docker exec fail2ban sh -c "fail2ban-client set $JAIL unbanip %s"
@@ -358,4 +357,12 @@ func pruneDockerImages() {
 		checkError(err, string(output))
 	}).Run()
 	printInBox(fmt.Sprintf("Pruned docker images. Have a super day!\n%s", strings.Split(string(output), "\n")[1]))
+}
+
+func mariadbUpgrade() {
+	// docker exec mariadb sh -c 'mysql_upgrade -uroot -p"$MYSQL_ROOT_PASSWORD"'
+	cmd := exec.Command("docker", "exec", "mariadb", "sh", "-c", `'mysql_upgrade -uroot -p"$MYSQL_ROOT_PASSWORD"'`)
+	output, err := cmd.CombinedOutput()
+	checkError(err, string(output))
+	printInBox(fmt.Sprintf("%s\n\nHave a radical day!", string(output)))
 }
