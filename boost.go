@@ -74,18 +74,14 @@ func runSelection(selection string, chosenSite string) {
 	switch selection {
 	case "Start Site":
 		startSite(chosenSite)
-
 	case "Stop Site":
 		stopSite(chosenSite)
-
 	case "Create Site":
 		createSite()
-
 	case "Delete Site & Files":
 		deleteSite(chosenSite)
-
 	case "Restart Site":
-		fmt.Println("Restarting site")
+		restartSite(chosenSite)
 
 	case "Fix Permissions":
 		fmt.Println("Fixing permissions")
@@ -162,6 +158,23 @@ func stopSite(chosenSite string) {
 		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
 	} else {
 		fmt.Println("Site stopped. Have a wonderful day!")
+	}
+}
+
+func restartSite(chosenSite string) {
+	var err error
+	var output []byte
+
+	spinner.New().Title("Restarting site...").Action(func() {
+		// docker compose -f "/home/$CUR_USER/sites/$sitename/docker-compose.yml" stop
+		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "restart")
+		output, err = cmd.CombinedOutput()
+	}).Run()
+
+	if err != nil {
+		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
+	} else {
+		fmt.Println("Site Restarted. Have a wonderful day!")
 	}
 }
 
