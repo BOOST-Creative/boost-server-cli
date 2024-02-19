@@ -257,12 +257,14 @@ func deleteSite(chosenSite string) {
 		Run()
 
 	if confirm {
-		exec.Command("docker", "compose", "-f", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite+"/docker-compose.yml", "stop").Run()
-		exec.Command("docker", "compose", "-f", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite+"/docker-compose.yml", "rm").Run()
-		exec.Command("sudo", "rm", "-r", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite).Run()
-	}
+		spinner.New().Title("Deleting site...").Action(func() {
+			exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").Run()
+			exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "rm").Run()
+			exec.Command("sudo", "rm", "-r", "/home/"+USER+"/sites/"+chosenSite).Run()
+		}).Run()
 
-	printInBox("Deleted " + chosenSite)
+		printInBox("Deleted " + chosenSite)
+	}
 
 }
 
