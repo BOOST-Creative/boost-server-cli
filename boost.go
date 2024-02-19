@@ -91,8 +91,7 @@ func runSelection(selection string, chosenSite string) {
 	case "Fail2ban Status":
 		fail2banStatus()
 	case "Unban IP":
-		fmt.Println("Unbanning IP")
-
+		unbanIp()
 	case "Whitelist IP":
 		fmt.Println("Whitelisting IP")
 
@@ -297,5 +296,31 @@ func fail2banStatus() {
 	cmd := exec.Command("docker", "exec", "fail2ban", "sh", "-c", "fail2ban-client status | sed -n 's/,//g;s/.*Jail list://p' | xargs -n1 fail2ban-client status")
 	output, err := cmd.CombinedOutput()
 	checkError(err, string(output))
-	fmt.Println(string(output))
+	printInBox(string(output))
+}
+
+func unbanIp() {
+	var ip string
+	huh.NewInput().
+		Title("Enter IP to unban").
+		Validate(func(s string) error {
+			if s == "" {
+				return fmt.Errorf("IP address cannot be empty")
+			}
+			return nil
+		}).
+		Value(&ip).
+		Run()
+
+	script := fmt.Sprintf(`
+		JAILS=$(docker exec fail2ban sh -c "fail2ban-client status | grep 'Jail list'" | sed -E 's/^[^:]+:[ \t]+//' | sed 's/,//g')
+		for JAIL in $JAILS
+		do
+			docker exec fail2ban sh -c "fail2ban-client set $JAIL unbanip %s"
+		done
+	`, ip)
+	cmd := exec.Command(script)
+	output, err := cmd.CombinedOutput()
+	checkError(err, string(output))
+	printInBox(fmt.Sprintf("Unbanned %s. Have a super day!", ip))
 }
