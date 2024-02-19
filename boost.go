@@ -95,8 +95,7 @@ func runSelection(selection string, chosenSite string) {
 	case "Whitelist IP":
 		whitelistIp()
 	case "Prune Docker Images":
-		fmt.Println("Pruning Docker images")
-
+		pruneDockerImages()
 	case "MariaDB Upgrade":
 		fmt.Println("Upgrading MariaDB")
 
@@ -346,4 +345,17 @@ func whitelistIp() {
 	output, err = cmd.CombinedOutput()
 	checkError(err, string(output))
 	printInBox(fmt.Sprintf("Whitelisted %s. Have a super day!", ip))
+}
+
+func pruneDockerImages() {
+	var output []byte
+	var err error
+	// spinner
+	spinner.New().Title("Pruning docker images...").Action(func() {
+		// docker image prune -af
+		cmd := exec.Command("docker", "image", "prune", "-af")
+		output, err = cmd.CombinedOutput()
+		checkError(err, string(output))
+	}).Run()
+	printInBox(fmt.Sprintf("Pruned docker images. Have a super day!\n%s", strings.Split(string(output), "\n")[1]))
 }
