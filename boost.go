@@ -76,7 +76,7 @@ func runSelection(selection string, chosenSite string) {
 		startSite(chosenSite)
 
 	case "Stop Site":
-		fmt.Println("Stopping site")
+		stopSite(chosenSite)
 
 	case "Create Site":
 		createSite()
@@ -148,6 +148,23 @@ func startSite(chosenSite string) {
 	}
 }
 
+func stopSite(chosenSite string) {
+	var err error
+	var output []byte
+
+	spinner.New().Title("Stopping site...").Action(func() {
+		// docker compose -f "/home/$CUR_USER/sites/$sitename/docker-compose.yml" stop
+		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop")
+		output, err = cmd.CombinedOutput()
+	}).Run()
+
+	if err != nil {
+		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
+	} else {
+		fmt.Println("Site stopped. Have a wonderful day!")
+	}
+}
+
 func createSite() {
 	var sitename string
 	huh.NewInput().
@@ -190,11 +207,6 @@ func createSite() {
 
 	printInBox(sb.String())
 }
-
-// replaceDashWithUnderscore is a function that replaces '-' with '_' in the given string.
-//
-// input string
-// returns string
 
 func deleteSite(chosenSite string) {
 	var confirm bool
