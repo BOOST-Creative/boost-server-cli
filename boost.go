@@ -86,10 +86,8 @@ func runSelection(selection string, chosenSite string) {
 		fixPermissions(chosenSite)
 	case "Add SSH Key":
 		addSSHKey()
-
 	case "Container Shell":
-		fmt.Println("Container shell")
-
+		containerShell(chosenSite)
 	case "Fail2ban Status":
 		fmt.Println("Fail2ban status")
 
@@ -290,4 +288,16 @@ func addSSHKey() {
 	}
 
 	printInBox("Added SSH key. Have a nice day!")
+}
+
+func containerShell(chosenSite string) {
+	notice := lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(fmt.Sprintf("Connecting shell for %s...", chosenSite))
+	fmt.Println(notice)
+	// docker exec -it "$sitename" ash
+	cmd := exec.Command("docker", "exec", "-it", chosenSite, "ash")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
+		os.Exit(1)
+	}
 }
