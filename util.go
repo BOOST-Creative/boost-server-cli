@@ -43,3 +43,7 @@ func GeneratePassword(length int) (string, error) {
 func ReplaceDashWithUnderscore(s string) string {
 	return strings.ReplaceAll(s, "-", "_")
 }
+
+func ReplaceSpacesWithDashes(s string) string {
+	return strings.ReplaceAll(s, " ", "-")
+}

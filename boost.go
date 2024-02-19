@@ -13,9 +13,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var options = huh.NewOptions("Start site", "Stop Site", "Create Site", "Delete Site & Files", "Restart Site", "Fix Permissions", "Add SSH Key", "Container Shell", "Fail2ban Status", "Unban IP", "Whitelist IP", "Prune Docker Images", "MariaDB Upgrade", "Change Site Domain", "DB Search Replace")
+var USER = os.Getenv("USER")
 
-var siteChooseOptions = []string{"Stop Site", "Restart Site", "Delete Site & Files", "Fix Permissions", "Container Shell", "Change Site Domain", "DB Search Replace"}
+var options = huh.NewOptions("Start Site", "Stop Site", "Create Site", "Delete Site & Files", "Restart Site", "Fix Permissions", "Add SSH Key", "Container Shell", "Fail2ban Status", "Unban IP", "Whitelist IP", "Prune Docker Images", "MariaDB Upgrade", "Change Site Domain", "DB Search Replace")
+
+var siteChooseOptions = []string{"Start Site", "Stop Site", "Restart Site", "Delete Site & Files", "Fix Permissions", "Container Shell", "Change Site Domain", "DB Search Replace"}
 
 func checkForUpdate() {
 	spinner.New().Title("Checking for update...").Action(func() {
@@ -25,7 +27,7 @@ func checkForUpdate() {
 
 func main() {
 	exec.Command("clear").Run()
-	checkForUpdate()
+	// checkForUpdate()
 
 	var chosenOption string
 	chosenSite := ""
@@ -70,12 +72,8 @@ func main() {
 
 func runSelection(selection string, chosenSite string) {
 	switch selection {
-	case "Start site":
-		fmt.Println("Starting site")
-		// docker compose -f "/home/$USER/sites/$sitename/docker-compose.yml" up -d
-		cmd := exec.Command("docker", "compose", "-f", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite+"/docker-compose.yml", "up", "-d")
-		output, _ := cmd.CombinedOutput()
-		fmt.Println(string(output))
+	case "Start Site":
+		startSite(chosenSite)
 
 	case "Stop Site":
 		fmt.Println("Stopping site")
@@ -128,27 +126,42 @@ func printInBox(content string) {
 	fmt.Println(
 		lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("166")).
+			BorderForeground(lipgloss.Color("63")).
 			Padding(1, 3).
 			Render(content),
 	)
 }
 
-func createSite() {
+func startSite(chosenSite string) {
+	var err error
+	var output []byte
+	//spinner
+	spinner.New().Title("Starting site...").Action(func() {
+		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "up", "-d")
+		output, err = cmd.CombinedOutput()
+	}).Run()
 
-	// get site name
+	if err != nil {
+		printInBox("Command failed with error:\n\n" + strings.TrimSpace(string(output)))
+	} else {
+		fmt.Println("Site started. Have a wonderful day!")
+	}
+}
+
+func createSite() {
 	var sitename string
 	huh.NewInput().
 		Title("Enter site name").
 		Validate(func(s string) error {
-			// validate that s has no whitespace
-			if strings.Contains(s, " ") {
-				return fmt.Errorf("site name cannot contain spaces")
+			if s == "" {
+				return fmt.Errorf("site name cannot be empty")
 			}
 			return nil
 		}).
 		Value(&sitename).
 		Run()
+
+	sitename = ReplaceSpacesWithDashes(sitename)
 
 	// spinner
 	spinner.New().Title("Creating site...").Action(func() {
@@ -157,12 +170,10 @@ func createSite() {
 
 	db_name := ReplaceDashWithUnderscore(sitename)
 	db_user := "u_" + ReplaceDashWithUnderscore(sitename)
-	db_pass, err := GeneratePassword(12)
+	db_pass, err := GeneratePassword(14)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println(lipgloss.NewStyle().Bold(true).Render("Created " + sitename + "!"))
 
 	var sb strings.Builder
 	keyword := func(s string) string {
@@ -170,7 +181,7 @@ func createSite() {
 	}
 	fmt.Fprintf(&sb,
 		"%s\n\nDatabase: %s\nUsername: %s\nPassword: %s\nServer:   %s",
-		lipgloss.NewStyle().Bold(true).Render("Database Credentials"),
+		lipgloss.NewStyle().Bold(true).Render("Created "+sitename+"!"),
 		keyword(db_name),
 		keyword(db_user),
 		keyword(db_pass),
