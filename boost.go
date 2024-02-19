@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
@@ -22,7 +23,8 @@ func checkForUpdate() {
 	}).Run()
 }
 
-func boost() {
+func main() {
+	exec.Command("clear").Run()
 	checkForUpdate()
 
 	var chosenOption string
@@ -66,33 +68,6 @@ func boost() {
 	runSelection(chosenOption, chosenSite)
 }
 
-func deleteSite(chosenSite string) {
-	var confirm bool
-	huh.NewConfirm().
-		Title("Are you sure?").
-		Description("Seriously, this will completely delete " + chosenSite + ".").
-		Affirmative("Yes").
-		Negative("No!").
-		Value(&confirm).
-		Run()
-
-	if confirm {
-		exec.Command("docker", "compose", "-f", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite+"/docker-compose.yml", "stop").Run()
-		exec.Command("docker", "compose", "-f", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite+"/docker-compose.yml", "rm").Run()
-		exec.Command("sudo", "rm", "-r", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite).Run()
-	}
-
-	fmt.Println(
-		lipgloss.NewStyle().
-			Width(40).
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("63")).
-			Padding(1, 2).
-			Render("lakjdflakjdlkfj"),
-	)
-
-}
-
 func runSelection(selection string, chosenSite string) {
 	switch selection {
 	case "Start site":
@@ -106,7 +81,7 @@ func runSelection(selection string, chosenSite string) {
 		fmt.Println("Stopping site")
 
 	case "Create Site":
-		fmt.Println("Creating site")
+		createSite()
 
 	case "Delete Site & Files":
 		deleteSite(chosenSite)
@@ -149,8 +124,85 @@ func runSelection(selection string, chosenSite string) {
 	}
 }
 
-func main() {
-	boost()
+func printInBox(content string) {
+	fmt.Println(
+		lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("166")).
+			Padding(1, 3).
+			Render(content),
+	)
+}
+
+func createSite() {
+
+	// get site name
+	var sitename string
+	huh.NewInput().
+		Title("Enter site name").
+		Validate(func(s string) error {
+			// validate that s has no whitespace
+			if strings.Contains(s, " ") {
+				return fmt.Errorf("site name cannot contain spaces")
+			}
+			return nil
+		}).
+		Value(&sitename).
+		Run()
+
+	// spinner
+	spinner.New().Title("Creating site...").Action(func() {
+		time.Sleep(1_000_000_000)
+	}).Run()
+
+	db_name := ReplaceDashWithUnderscore(sitename)
+	db_user := "u_" + ReplaceDashWithUnderscore(sitename)
+	db_pass, err := GeneratePassword(12)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(lipgloss.NewStyle().Bold(true).Render("Created " + sitename + "!"))
+
+	var sb strings.Builder
+	keyword := func(s string) string {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("166")).Render(s)
+	}
+	fmt.Fprintf(&sb,
+		"%s\n\nDatabase: %s\nUsername: %s\nPassword: %s\nServer:   %s",
+		lipgloss.NewStyle().Bold(true).Render("Database Credentials"),
+		keyword(db_name),
+		keyword(db_user),
+		keyword(db_pass),
+		keyword("mariadb"),
+	)
+
+	printInBox(sb.String())
+}
+
+// replaceDashWithUnderscore is a function that replaces '-' with '_' in the given string.
+//
+// input string
+// returns string
+
+func deleteSite(chosenSite string) {
+	var confirm bool
+	huh.NewConfirm().
+		Title("Are you sure?").
+		Description("Seriously, this will completely delete " + chosenSite + ".").
+		Affirmative("Yes").
+		Negative("No!").
+		Value(&confirm).
+		Run()
+
+	if confirm {
+		exec.Command("docker", "compose", "-f", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite+"/docker-compose.yml", "stop").Run()
+		exec.Command("docker", "compose", "-f", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite+"/docker-compose.yml", "rm").Run()
+		exec.Command("sudo", "rm", "-r", "/home/"+os.Getenv("USER")+"/sites/"+chosenSite).Run()
+	}
+
+	printInBox("Deleted " + chosenSite)
+
 }
 
 func addSSHKey() {
@@ -161,11 +213,5 @@ func addSSHKey() {
 		Value(&key).
 		Run()
 
-	fmt.Println(
-		lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("63")).
-			Padding(1, 3).
-			Render("Added SSH key. Have a nice day!"),
-	)
+	printInBox("Added SSH key. Have a nice day!")
 }
