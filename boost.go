@@ -525,7 +525,7 @@ func changeSiteDomain() {
 		huh.NewGroup(
 			huh.NewNote().
 				Title("Change Domain").
-				Description(lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(fmt.Sprintf("This will change the domain(s) in Caddy\n\nCurrent domain(s): %s", chosenSite))),
+				Description("This will change the domain(s) in Caddy\nCurrent domain(s): "+lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(string(output))),
 
 			huh.NewInput().
 				Title("Enter new domain").
@@ -540,6 +540,7 @@ func changeSiteDomain() {
 
 			huh.NewConfirm().
 				Title("SSL Certificate").
+				Description("If proxying through Cloudflare, use self-signed and CF setting for strict SSL.").
 				Affirmative("Let's Encrypt / ZeroSSL").
 				Negative("Self-Signed").
 				Value(&generateSSL),
