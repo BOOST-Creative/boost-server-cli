@@ -13,11 +13,35 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+type Option struct {
+	name       string
+	chooseSite bool
+	action     func()
+}
+
+var options = []Option{
+	{"Start Site", true, startSite},
+	{"Stop Site", true, stopSite},
+	{"Create Site", true, createSite},
+	{"Delete Site & Files", true, deleteSite},
+	{"Restart Site", true, restartSite},
+	{"Container Shell", true, containerShell},
+	{"Fix Permissions", true, fixPermissions},
+	{"Database Search Replace", true, databaseSearchReplace},
+	{"Add SSH Key", false, addSSHKey},
+	{"Prune Docker Images", false, pruneDockerImages},
+	{"MariaDB Upgrade", false, mariadbUpgrade},
+	{"Change Site Domain", false, changeSiteDomain},
+	{"Fail2ban Status", false, fail2banStatus},
+	{"Unban IP", false, unbanIp},
+	{"Whitelist IP", false, whitelistIp},
+}
+
 var USER = os.Getenv("USER")
-
-var options = huh.NewOptions("Start Site", "Stop Site", "Create Site", "Delete Site & Files", "Restart Site", "Fix Permissions", "Add SSH Key", "Container Shell", "Prune Docker Images", "MariaDB Upgrade", "Change Site Domain", "Database Search Replace", "Fail2ban Status", "Unban IP", "Whitelist IP")
-
-var siteChooseOptions = []string{"Start Site", "Stop Site", "Restart Site", "Delete Site & Files", "Fix Permissions", "Container Shell", "Change Site Domain", "Database Search Replace"}
+var chosenOption string
+var chosenSite string
+var allOptions []string
+var chooseSiteOptions []string
 
 func checkForUpdate() {
 	spinner.New().Title("Checking for update...").Action(func() {
@@ -26,11 +50,15 @@ func checkForUpdate() {
 }
 
 func main() {
-	// exec.Command("clear").Run()
-	checkForUpdate()
+	// checkForUpdate()
 
-	var chosenOption string
-	chosenSite := ""
+	// Add options to the lists
+	for _, opt := range options {
+		allOptions = append(allOptions, opt.name)
+		if opt.chooseSite {
+			chooseSiteOptions = append(chooseSiteOptions, opt.name)
+		}
+	}
 
 	form := huh.NewForm(
 
@@ -39,7 +67,7 @@ func main() {
 			huh.NewSelect[string]().
 				Title("What do you want to do?").
 				Options(
-					options...,
+					huh.NewOptions(allOptions...)...,
 				).
 				Value(&chosenOption), // store the chosen option in the "burger" variable
 		),
@@ -53,7 +81,7 @@ func main() {
 				).
 				Value(&chosenSite),
 		).WithHideFunc(func() bool {
-			for _, option := range siteChooseOptions {
+			for _, option := range chooseSiteOptions {
 				if chosenOption == option {
 					return false
 				}
@@ -67,44 +95,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	runSelection(chosenOption, chosenSite)
-}
-
-func runSelection(selection string, chosenSite string) {
-	switch selection {
-	case "Start Site":
-		startSite(chosenSite)
-	case "Stop Site":
-		stopSite(chosenSite)
-	case "Create Site":
-		createSite()
-	case "Delete Site & Files":
-		deleteSite(chosenSite)
-	case "Restart Site":
-		restartSite(chosenSite)
-	case "Fix Permissions":
-		fixPermissions(chosenSite)
-	case "Add SSH Key":
-		addSSHKey()
-	case "Container Shell":
-		containerShell(chosenSite)
-	case "Fail2ban Status":
-		fail2banStatus()
-	case "Unban IP":
-		unbanIp()
-	case "Whitelist IP":
-		whitelistIp()
-	case "Prune Docker Images":
-		pruneDockerImages()
-	case "MariaDB Upgrade":
-		mariadbUpgrade()
-	case "Change Site Domain":
-		changeSiteDomain(chosenSite)
-	case "Database Search Replace":
-		databaseSearchReplace(chosenSite)
-	default:
-		fmt.Println("Invalid selection")
+	// Run the chosen action
+	for _, option := range options {
+		if option.name == chosenOption {
+			option.action()
+			return
+		}
 	}
+
+	printInBox("Invalid selection. Buh bye!")
 }
 
 func printInBox(content string) {
@@ -130,7 +129,7 @@ func getSudo() {
 	checkError(err, "Failed to grant sudo permissions.")
 }
 
-func startSite(chosenSite string) {
+func startSite() {
 	var err error
 	var output []byte
 	//spinner
@@ -142,7 +141,7 @@ func startSite(chosenSite string) {
 	fmt.Println("Site started. Have a wonderful day!")
 }
 
-func stopSite(chosenSite string) {
+func stopSite() {
 	var err error
 	var output []byte
 
@@ -156,7 +155,7 @@ func stopSite(chosenSite string) {
 	fmt.Println("Site stopped. Have a phenomenal day!")
 }
 
-func restartSite(chosenSite string) {
+func restartSite() {
 	var err error
 	var output []byte
 
@@ -213,7 +212,7 @@ func createSite() {
 	printInBox(sb.String())
 }
 
-func fixPermissions(chosenSite string) {
+func fixPermissions() {
 	getSudo()
 
 	// spinner
@@ -235,7 +234,7 @@ func fixPermissions(chosenSite string) {
 	printInBox("Permissions fixed. Have a fantastic day!")
 }
 
-func deleteSite(chosenSite string) {
+func deleteSite() {
 	// TODO: delete database
 	var confirm bool
 	huh.NewConfirm().
@@ -289,7 +288,7 @@ func addSSHKey() {
 	printInBox("Added SSH key. Have a nice day!")
 }
 
-func containerShell(chosenSite string) {
+func containerShell() {
 	notice := lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(fmt.Sprintf("Connecting shell for %s...", chosenSite))
 	fmt.Println(notice)
 	// docker exec -it "$sitename" ash
@@ -380,7 +379,7 @@ func mariadbUpgrade() {
 	printInBox(fmt.Sprintf("%s\n\nHave a fabulous day!", string(output)))
 }
 
-func databaseSearchReplace(chosenSite string) {
+func databaseSearchReplace() {
 	var search string
 	var replace string
 
@@ -418,7 +417,7 @@ func databaseSearchReplace(chosenSite string) {
 	printInBox(fmt.Sprintf("%s\n\nHave a radical day!", string(output)))
 }
 
-func changeSiteDomain(chosenSite string) {
+func changeSiteDomain() {
 	// get current site
 	// yq '.services.wordpress.labels.caddy' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
 	output, err := exec.Command("yq", ".services.wordpress.labels.caddy", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml").CombinedOutput()
