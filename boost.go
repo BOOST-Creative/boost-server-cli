@@ -26,8 +26,8 @@ func checkForUpdate() {
 }
 
 func main() {
-	exec.Command("clear").Run()
-	// checkForUpdate()
+	// exec.Command("clear").Run()
+	checkForUpdate()
 
 	var chosenOption string
 	chosenSite := ""
@@ -99,8 +99,7 @@ func runSelection(selection string, chosenSite string) {
 	case "MariaDB Upgrade":
 		mariadbUpgrade()
 	case "Change Site Domain":
-		fmt.Println("Changing site domain")
-
+		changeSiteDomain(chosenSite)
 	case "Database Search Replace":
 		databaseSearchReplace(chosenSite)
 	default:
@@ -123,6 +122,12 @@ func checkError(err error, msg string) {
 		printInBox(fmt.Sprintf("Command failed with error:\n\n%s", strings.TrimSpace(msg)))
 		os.Exit(1)
 	}
+}
+
+// Grant sudo permissions
+func getSudo() {
+	err := exec.Command("sudo", "-v").Run()
+	checkError(err, "Failed to grant sudo permissions.")
 }
 
 func startSite(chosenSite string) {
@@ -148,7 +153,7 @@ func stopSite(chosenSite string) {
 	}).Run()
 
 	checkError(err, string(output))
-	fmt.Println("Site stopped. Have a wonderful day!")
+	fmt.Println("Site stopped. Have a phenomenal day!")
 }
 
 func restartSite(chosenSite string) {
@@ -162,7 +167,7 @@ func restartSite(chosenSite string) {
 	}).Run()
 
 	checkError(err, string(output))
-	fmt.Println("Site Restarted. Have a wonderful day!")
+	fmt.Println("Site Restarted. Have a superb day!")
 }
 
 func createSite() {
@@ -209,8 +214,10 @@ func createSite() {
 }
 
 func fixPermissions(chosenSite string) {
+	getSudo()
+
 	// spinner
-	spinner.New().Title("Fixing permissions...").Action(func() {
+	spinner.New().Title(fmt.Sprintf("Fixing permissions for %s...", chosenSite)).Action(func() {
 		// sudo chown -R nobody: "/home/$CUR_USER/sites/$sitename/wordpress"
 		cmd := exec.Command("sudo", "chown", "-R", "nobody:", "/home/"+USER+"/sites/"+chosenSite+"/wordpress")
 		output, err := cmd.CombinedOutput()
@@ -239,6 +246,7 @@ func deleteSite(chosenSite string) {
 		Run()
 
 	if confirm {
+		getSudo()
 		spinner.New().Title("Deleting site...").Action(func() {
 			output, err := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").CombinedOutput()
 			checkError(err, string(output))
@@ -334,6 +342,8 @@ func whitelistIp() {
 		Value(&ip).
 		Run()
 
+	getSudo()
+
 	// sudo sed -i "s|ignoreip =.*|& $whitelistip|" ~/server/fail2ban/data/jail.d/jail.local
 	cmd := exec.Command("sudo", "sed", "-i", fmt.Sprintf("s|ignoreip =.*|& %s|", ip), "/home/"+USER+"/server/fail2ban/data/jail.d/jail.local")
 	output, err := cmd.CombinedOutput()
@@ -363,7 +373,7 @@ func mariadbUpgrade() {
 	cmd := exec.Command("docker", "exec", "mariadb", "sh", "-c", `'mysql_upgrade -uroot -p"$MYSQL_ROOT_PASSWORD"'`)
 	output, err := cmd.CombinedOutput()
 	checkError(err, string(output))
-	printInBox(fmt.Sprintf("%s\n\nHave a radical day!", string(output)))
+	printInBox(fmt.Sprintf("%s\n\nHave a fabulous day!", string(output)))
 }
 
 func databaseSearchReplace(chosenSite string) {
@@ -402,4 +412,71 @@ func databaseSearchReplace(chosenSite string) {
 	output, err := cmd.CombinedOutput()
 	checkError(err, string(output))
 	printInBox(fmt.Sprintf("%s\n\nHave a radical day!", string(output)))
+}
+
+func changeSiteDomain(chosenSite string) {
+	// get current site
+	// yq '.services.wordpress.labels.caddy' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
+	output, err := exec.Command("yq", ".services.wordpress.labels.caddy", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml").CombinedOutput()
+	checkError(err, string(output))
+
+	var newDomain string
+	var generateSSL bool
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewNote().
+				Title("Change Domain").
+				Description(lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(fmt.Sprintf("This will change the domain(s) in Caddy\n\nCurrent domain(s): %s", chosenSite))),
+
+			huh.NewInput().
+				Title("Enter new domain").
+				Description("Separate domains with a space.").
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("domain cannot be empty")
+					}
+					return nil
+				}).
+				Value(&newDomain),
+
+			huh.NewConfirm().
+				Title("SSL Certificate").
+				Affirmative("Let's Encrypt / ZeroSSL").
+				Negative("Self-Signed").
+				Value(&generateSSL),
+		),
+	)
+	form.Run()
+
+	spinner.New().Title("Changing domain...").Action(func() {
+		// update caddy tls option
+		if generateSSL {
+			// yq -i 'del(.services.wordpress.labels."caddy.tls")' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
+			cmd := exec.Command("yq", "-i", "del(.services.wordpress.labels.\"caddy.tls\")", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml")
+			output, err := cmd.CombinedOutput()
+			checkError(err, string(output))
+		} else {
+			// yq -i '.services.wordpress.labels."caddy.tls" = "internal"' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
+			cmd := exec.Command("yq", "-i", ".services.wordpress.labels.\"caddy.tls\" = \"internal\"", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml")
+			output, err := cmd.CombinedOutput()
+			checkError(err, string(output))
+		}
+
+		// update caddy domain
+		// yq -i ".services.wordpress.labels.caddy = \"$newdomain\"" "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
+		cmd := exec.Command("yq", "-i", fmt.Sprintf(".services.wordpress.labels.caddy = \"%s\"", newDomain), "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml")
+		output, err = cmd.CombinedOutput()
+		checkError(err, string(output))
+
+		// reload site
+		cmd = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "up", "-d")
+		output, err = cmd.CombinedOutput()
+		checkError(err, string(output))
+
+	}).Run()
+	checkError(err, string(output))
+
+	printInBox("Domain updated. Have a tubular day!")
+
 }
