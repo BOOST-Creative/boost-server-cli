@@ -155,6 +155,128 @@ func stopSite() {
 	fmt.Println("Site stopped. Have a phenomenal day!")
 }
 
+func createSite() {
+	getSudo()
+
+	var sitename string
+	php7 := false
+	createDb := true
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Enter site name").
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("site name cannot be empty")
+					}
+					return nil
+				}).
+				Value(&sitename),
+
+			huh.NewConfirm().
+				Title("Requires PHP 7").
+				Affirmative("Yes").
+				Negative("Hell nah").
+				Value(&php7),
+
+			huh.NewConfirm().
+				Title("Create database").
+				Affirmative("Yes").
+				Negative("No").
+				Value(&createDb),
+		),
+	)
+
+	err := form.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sitename = ReplaceSpacesWithDashes(sitename)
+
+	var db_name string
+	var db_user string
+	var db_pass string
+
+	repo_base := "https://raw.githubusercontent.com/BOOST-Creative/docker-server-setup-caddy/main"
+
+	type Download struct {
+		source string
+		target string
+	}
+
+	wordpressCompose := Download{
+		source: repo_base + "/wordpress/docker-compose.yml",
+		target: "/home/" + USER + "/sites/" + sitename + "/docker-compose.yml",
+	}
+	htNinja := Download{
+		source: repo_base + "/wordpress/.htninja",
+		target: "/home/" + USER + "/sites/" + sitename + "/.htninja",
+	}
+	redisConf := Download{
+		source: repo_base + "/wordpress/redis.conf",
+		target: "/home/" + USER + "/sites/" + sitename + "/redis.conf",
+	}
+
+	// spinner
+	spinner.New().Title("Creating site...").Action(func() {
+		// download files
+		DownloadFile(wordpressCompose.source, wordpressCompose.target)
+		DownloadFile(htNinja.source, htNinja.target)
+		DownloadFile(redisConf.source, redisConf.target)
+
+		// replace strings
+		ReplaceTextInFile(wordpressCompose.target, "CHANGE_TO_SITE_NAME", sitename)
+		ReplaceTextInFile(wordpressCompose.target, "CHANGE_TO_USERNAME", USER)
+		if php7 {
+			ReplaceTextInFile(wordpressCompose.target, "docker-wordpress-8", "docker-wordpress-7")
+		}
+
+		// create container
+		// docker compose -f "/home/$CUR_USER/sites/$sitename/docker-compose.yml" create
+		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+sitename+"/docker-compose.yml", "create")
+		_, err = cmd.CombinedOutput()
+		checkError(err, "Failed to create site.")
+
+		// fix permissions
+		// sudo chown nobody: "/home/$CUR_USER/sites/$sitename/wordpress"
+		cmd = exec.Command("sudo", "chown", "nobody:", "/home/"+USER+"/sites/"+sitename+"/wordpress")
+		_, err = cmd.CombinedOutput()
+		checkError(err, "Failed to set permissions")
+
+		// create database
+		if createDb {
+			var err error
+			db_name = ReplaceDashWithUnderscore(sitename)
+			db_user = "u_" + ReplaceDashWithUnderscore(sitename)
+			db_pass, err = GeneratePassword(14)
+			checkError(err, "Failed to generate password.")
+		}
+
+	}).Run()
+
+	var sb strings.Builder
+	msg := lipgloss.NewStyle().Bold(true).Render("Created " + sitename + "!")
+
+	fmt.Fprint(&sb, msg)
+
+	if createDb {
+		keyword := func(s string) string {
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(s)
+		}
+		fmt.Fprintf(&sb,
+			"\n\nDatabase: %s\nUsername: %s\nPassword: %s\nServer:   %s",
+			keyword(db_name),
+			keyword(db_user),
+			keyword(db_pass),
+			keyword("mariadb"),
+		)
+	}
+
+	printInBox(sb.String())
+}
+
 func restartSite() {
 	var err error
 	var output []byte
@@ -167,49 +289,6 @@ func restartSite() {
 
 	checkError(err, string(output))
 	fmt.Println("Site Restarted. Have a superb day!")
-}
-
-func createSite() {
-	var sitename string
-	huh.NewInput().
-		Title("Enter site name").
-		Validate(func(s string) error {
-			if s == "" {
-				return fmt.Errorf("site name cannot be empty")
-			}
-			return nil
-		}).
-		Value(&sitename).
-		Run()
-
-	sitename = ReplaceSpacesWithDashes(sitename)
-
-	// spinner
-	spinner.New().Title("Creating site...").Action(func() {
-		time.Sleep(1_000_000_000)
-	}).Run()
-
-	db_name := ReplaceDashWithUnderscore(sitename)
-	db_user := "u_" + ReplaceDashWithUnderscore(sitename)
-	db_pass, err := GeneratePassword(14)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var sb strings.Builder
-	keyword := func(s string) string {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(s)
-	}
-	fmt.Fprintf(&sb,
-		"%s\n\nDatabase: %s\nUsername: %s\nPassword: %s\nServer:   %s",
-		lipgloss.NewStyle().Bold(true).Render("Created "+sitename+"!"),
-		keyword(db_name),
-		keyword(db_user),
-		keyword(db_pass),
-		keyword("mariadb"),
-	)
-
-	printInBox(sb.String())
 }
 
 func fixPermissions() {

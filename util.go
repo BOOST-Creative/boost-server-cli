@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -97,13 +99,45 @@ func AppendToFile(fileName, content string) error {
 	return nil
 }
 
-// ValidateNotEmpty checks if the given string is not empty.
-//
-// s string
-// error
-func ValidateNotEmpty(s string) error {
-	if s == "" {
-		return fmt.Errorf("search string cannot be empty")
+func DownloadFile(url, destination string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
 	}
+	defer resp.Body.Close()
+
+	// Create the output file
+	out, err := os.Create(destination)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the contents to the file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// fmt.Printf("File downloaded to: %s\n", destination)
+	return nil
+}
+
+func ReplaceTextInFile(filePath, oldText, newText string) error {
+	// Read the content of the file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Perform the replacement
+	newContent := strings.Replace(string(content), oldText, newText, -1)
+
+	// Write the modified content back to the file
+	err = os.WriteFile(filePath, []byte(newContent), 0644)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
