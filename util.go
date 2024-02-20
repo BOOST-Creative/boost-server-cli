@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-// gets list of directories in path
+// GetDirectoriesInPath retrieves the list of directories in the specified path.
+//
+// It takes a path string as a parameter and returns a slice of strings.
 func GetDirectoriesInPath(path string) (sites []string) {
 	dirs, _ := os.ReadDir(path)
 	for _, entry := range dirs {
@@ -20,6 +22,13 @@ func GetDirectoriesInPath(path string) (sites []string) {
 	return
 }
 
+// GeneratePassword generates a password of the specified length.
+//
+// Parameter(s):
+// length int - the desired length of the password
+// Return type(s):
+// string - the generated password
+// error - an error, if any
 func GeneratePassword(length int) (string, error) {
 	// Calculate the required byte length based on the desired password length
 	byteLength := (length * 3) / 4
@@ -42,14 +51,26 @@ func GeneratePassword(length int) (string, error) {
 	return password, nil
 }
 
+// ReplaceDashWithUnderscore replaces dashes with underscores in the given string.
+//
+// s: a string to be processed
+// string: the modified string with dashes replaced by underscores
 func ReplaceDashWithUnderscore(s string) string {
 	return strings.ReplaceAll(s, "-", "_")
 }
 
+// ReplaceSpacesWithDashes replaces spaces with dashes in the given string.
+//
+// It takes a string parameter and returns a string.
 func ReplaceSpacesWithDashes(s string) string {
 	return strings.ReplaceAll(s, " ", "-")
 }
 
+// AppendToFile appends the given content to the specified file.
+//
+// fileName: the name of the file to which the content will be appended
+// content: the content to be appended to the file
+// error: returns an error if the operation fails
 func AppendToFile(fileName, content string) error {
 	// Open the file in append mode, create it if it doesn't exist
 	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
@@ -73,5 +94,16 @@ func AppendToFile(fileName, content string) error {
 		return err
 	}
 
+	return nil
+}
+
+// ValidateNotEmpty checks if the given string is not empty.
+//
+// s string
+// error
+func ValidateNotEmpty(s string) error {
+	if s == "" {
+		return fmt.Errorf("search string cannot be empty")
+	}
 	return nil
 }

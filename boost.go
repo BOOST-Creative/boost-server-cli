@@ -102,8 +102,7 @@ func runSelection(selection string, chosenSite string) {
 		fmt.Println("Changing site domain")
 
 	case "Database Search Replace":
-		fmt.Println("DB search and replace")
-
+		databaseSearchReplace(chosenSite)
 	default:
 		fmt.Println("Invalid selection")
 	}
@@ -362,6 +361,44 @@ func pruneDockerImages() {
 func mariadbUpgrade() {
 	// docker exec mariadb sh -c 'mysql_upgrade -uroot -p"$MYSQL_ROOT_PASSWORD"'
 	cmd := exec.Command("docker", "exec", "mariadb", "sh", "-c", `'mysql_upgrade -uroot -p"$MYSQL_ROOT_PASSWORD"'`)
+	output, err := cmd.CombinedOutput()
+	checkError(err, string(output))
+	printInBox(fmt.Sprintf("%s\n\nHave a radical day!", string(output)))
+}
+
+func databaseSearchReplace(chosenSite string) {
+	var search string
+	var replace string
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Enter search string").
+				Description("This string will be replaced in the database.").
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("search string cannot be empty")
+					}
+					return nil
+				}).
+				Value(&search),
+
+			huh.NewInput().
+				Title("Enter replace string").
+				Description("This string will replace the search string.").
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("replace string cannot be empty")
+					}
+					return nil
+				}).
+				Value(&replace),
+		),
+	)
+	form.Run()
+
+	// docker exec "$sitename" sh -c "cd /usr/src/wordpress && wp search-replace '$searchstring' '$replacestring' --all-tables"
+	cmd := exec.Command("docker", "exec", chosenSite, "sh", "-c", fmt.Sprintf("cd /usr/src/wordpress && wp search-replace '%s' '%s' --all-tables", search, replace))
 	output, err := cmd.CombinedOutput()
 	checkError(err, string(output))
 	printInBox(fmt.Sprintf("%s\n\nHave a radical day!", string(output)))
