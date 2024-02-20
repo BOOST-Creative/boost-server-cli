@@ -281,8 +281,6 @@ func addSSHKey() {
 		Value(&key).
 		Run()
 
-	// cmd := exec.Command("echo", key, ">>", "/home/"+USER+"/.ssh/authorized_keys")
-	// output, err := cmd.CombinedOutput()
 	err := AppendToFile("/home/"+USER+"/.ssh/authorized_keys", key)
 	if err != nil {
 		log.Fatal(err)
