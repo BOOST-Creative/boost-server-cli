@@ -236,6 +236,7 @@ func fixPermissions(chosenSite string) {
 }
 
 func deleteSite(chosenSite string) {
+	// TODO: delete database
 	var confirm bool
 	huh.NewConfirm().
 		Title("Are you sure?").
@@ -248,10 +249,15 @@ func deleteSite(chosenSite string) {
 	if confirm {
 		getSudo()
 		spinner.New().Title("Deleting site...").Action(func() {
-			output, err := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").CombinedOutput()
+			// drop database
+			output, err := exec.Command("docker", "exec", chosenSite, "sh", "-c", `"cd /usr/src/wordpress && wp db drop --yes"`).CombinedOutput()
+			checkError(err, string(output))
+			// stop and remove containers
+			output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").CombinedOutput()
 			checkError(err, string(output))
 			output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "rm").CombinedOutput()
 			checkError(err, string(output))
+			// remove site folder
 			output, err = exec.Command("sudo", "rm", "-r", "/home/"+USER+"/sites/"+chosenSite).CombinedOutput()
 			checkError(err, string(output))
 		}).Run()
