@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -22,16 +23,16 @@ type Option struct {
 var options = []Option{
 	{"Start Site", true, startSite},
 	{"Stop Site", true, stopSite},
-	{"Create Site", true, createSite},
+	{"Create Site", false, createSite},
 	{"Delete Site & Files", true, deleteSite},
 	{"Restart Site", true, restartSite},
+	{"Change Site Domain", true, changeSiteDomain},
 	{"Container Shell", true, containerShell},
 	{"Fix Permissions", true, fixPermissions},
 	{"Database Search Replace", true, databaseSearchReplace},
 	{"Add SSH Key", false, addSSHKey},
 	{"Prune Docker Images", false, pruneDockerImages},
 	{"MariaDB Upgrade", false, mariadbUpgrade},
-	{"Change Site Domain", false, changeSiteDomain},
 	{"Fail2ban Status", false, fail2banStatus},
 	{"Unban IP", false, unbanIp},
 	{"Whitelist IP", false, whitelistIp},
@@ -77,7 +78,7 @@ func main() {
 			huh.NewSelect[string]().
 				Title("Which site?").
 				Options(
-					huh.NewOptions(GetDirectoriesInPath("/home/hank")...)...,
+					huh.NewOptions(GetDirectoriesInPath("/home/"+USER+"/sites")...)...,
 				).
 				Value(&chosenSite),
 		).WithHideFunc(func() bool {
@@ -114,6 +115,8 @@ func printInBox(content string) {
 			Padding(1, 3).
 			Render(content),
 	)
+
+	fmt.Println()
 }
 
 func checkError(err error, msg string) {
@@ -133,7 +136,7 @@ func startSite() {
 	var err error
 	var output []byte
 	//spinner
-	spinner.New().Title("Starting site...").Action(func() {
+	spinner.New().Title("Starting " + chosenSite + "...").Action(func() {
 		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "up", "-d")
 		output, err = cmd.CombinedOutput()
 	}).Run()
@@ -145,7 +148,7 @@ func stopSite() {
 	var err error
 	var output []byte
 
-	spinner.New().Title("Stopping site...").Action(func() {
+	spinner.New().Title("Stopping " + chosenSite + "...").Action(func() {
 		// docker compose -f "/home/$CUR_USER/sites/$sitename/docker-compose.yml" stop
 		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop")
 		output, err = cmd.CombinedOutput()
@@ -221,6 +224,10 @@ func createSite() {
 
 	// spinner
 	spinner.New().Title("Creating site...").Action(func() {
+		// create directory
+		err := os.MkdirAll("/home/"+USER+"/sites/"+sitename+"/wordpress", os.ModePerm)
+		checkError(err, "Failed to create directory.")
+
 		// download files
 		DownloadFile(wordpressCompose.source, wordpressCompose.target)
 		DownloadFile(htNinja.source, htNinja.target)
@@ -247,11 +254,18 @@ func createSite() {
 
 		// create database
 		if createDb {
-			var err error
 			db_name = ReplaceDashWithUnderscore(sitename)
 			db_user = "u_" + ReplaceDashWithUnderscore(sitename)
 			db_pass, err = GeneratePassword(14)
 			checkError(err, "Failed to generate password.")
+			output, err := exec.Command("docker", "exec", "-e", "DB_NAME="+db_name, "mariadb", "bash", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"CREATE DATABASE $DB_NAME;\"").CombinedOutput()
+			checkError(err, string(output))
+			// create user
+			output, err = exec.Command("docker", "exec", "-e", "DB_USER="+db_user, "-e", "DB_PASSWORD="+db_pass, "mariadb", "bash", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"CREATE USER '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';\"").CombinedOutput()
+			checkError(err, string(output))
+			// grant user privileges to database
+			output, err = exec.Command("docker", "exec", "-e", "DB_NAME="+db_name, "-e", "DB_USER="+db_user, "mariadb", "bash", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'%';\"").CombinedOutput()
+			checkError(err, string(output))
 		}
 
 	}).Run()
@@ -272,6 +286,7 @@ func createSite() {
 			keyword(db_pass),
 			keyword("mariadb"),
 		)
+		clipboard.WriteAll(fmt.Sprintf("Database: %s\nUsername: %s\nPassword: %s\nServer:   %s", db_name, db_user, db_pass, "mariadb"))
 	}
 
 	printInBox(sb.String())
@@ -281,7 +296,7 @@ func restartSite() {
 	var err error
 	var output []byte
 
-	spinner.New().Title("Restarting site...").Action(func() {
+	spinner.New().Title("Restarting " + chosenSite + "...").Action(func() {
 		// docker compose -f "/home/$CUR_USER/sites/$sitename/docker-compose.yml" stop
 		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "restart")
 		output, err = cmd.CombinedOutput()
@@ -327,8 +342,9 @@ func deleteSite() {
 	if confirm {
 		getSudo()
 		spinner.New().Title("Deleting site...").Action(func() {
+			db_name := strings.ReplaceAll(chosenSite, "-", "_")
 			// drop database
-			output, err := exec.Command("docker", "exec", chosenSite, "sh", "-c", `"cd /usr/src/wordpress && wp db drop --yes"`).CombinedOutput()
+			output, err := exec.Command("docker", "exec", "-e", "DB_NAME="+db_name, "mariadb", "bash", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"DROP DATABASE $DB_NAME;\"").CombinedOutput()
 			checkError(err, string(output))
 			// stop and remove containers
 			output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").CombinedOutput()

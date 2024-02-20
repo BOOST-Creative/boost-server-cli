@@ -6,7 +6,6 @@ require (
 	github.com/charmbracelet/huh v0.3.0
 	github.com/charmbracelet/huh/spinner v0.0.0-20240209193029-45947515c4cf
 	github.com/charmbracelet/lipgloss v0.9.1
-	github.com/charmbracelet/x/exp/strings v0.0.0-20240212161549-c6c7abef80f4
 )
 
 require (
