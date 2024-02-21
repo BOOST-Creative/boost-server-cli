@@ -164,6 +164,7 @@ func createSite() {
 	var sitename string
 	php7 := false
 	createDb := true
+	domain := ""
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -176,6 +177,17 @@ func createSite() {
 					return nil
 				}).
 				Value(&sitename),
+
+			huh.NewInput().
+				Title("Enter domain(s)").
+				Description("Separate domains with a space.").
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("domain cannot be empty")
+					}
+					return nil
+				}).
+				Value(&domain),
 
 			huh.NewConfirm().
 				Title("Requires PHP 7").
@@ -239,10 +251,14 @@ func createSite() {
 		if php7 {
 			ReplaceTextInFile(wordpressCompose.target, "docker-wordpress-8", "docker-wordpress-7")
 		}
+		// update domain
+		cmd := exec.Command("yq", "-i", fmt.Sprintf(".services.wordpress.labels.caddy = \"%s\"", domain), wordpressCompose.target)
+		output, err := cmd.CombinedOutput()
+		checkError(err, string(output))
 
 		// create container
 		// docker compose -f "/home/$CUR_USER/sites/$sitename/docker-compose.yml" create
-		cmd := exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+sitename+"/docker-compose.yml", "create")
+		cmd = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+sitename+"/docker-compose.yml", "create")
 		_, err = cmd.CombinedOutput()
 		checkError(err, "Failed to create site.")
 
