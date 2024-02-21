@@ -1,6 +1,8 @@
 builds:
   # You can have multiple builds defined as a yaml list
   - #
+    id: boost
+    binary: boost
     goos:
       - linux
 
