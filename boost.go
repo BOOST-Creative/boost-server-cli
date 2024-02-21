@@ -439,11 +439,12 @@ func addSSHKey() {
 func containerShell() {
 	notice := lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(fmt.Sprintf("Connecting shell for %s...", chosenSite))
 	fmt.Println(notice)
-	// docker exec -it "$sitename" ash
 	cmd := exec.Command("docker", "exec", "-it", chosenSite, "ash")
-	output, err := cmd.CombinedOutput()
-
-	checkError(err, string(output))
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	checkError(err, "Could not spawn shell")
+	printInBox("Have a magnificent day!")
 }
 
 func fail2banStatus() {
