@@ -66,17 +66,15 @@ func checkForUpdate() {
 	getSudo()
 
 	var exe string
-	spinner.New().Title("Updating...").Action(func() {
+	spinner.New().Title(fmt.Sprintf("Updating to %s...", latest.Version)).Action(func() {
 		exe, err = os.Executable()
 		checkError(err, "Could not locate executable path")
 		err = selfupdate.UpdateTo(latest.AssetURL, exe)
-	})
+	}).Run()
 	if err != nil {
 		checkError(err, "Error occurred while updating binary: "+err.Error())
 	}
-
 	printInBox(fmt.Sprintf("Successfully updated: %s -> %s\n\nRelease note:\n%s", VERSION, latest.Version, strings.TrimSpace(latest.ReleaseNotes)))
-
 	os.Exit(0)
 }
 
