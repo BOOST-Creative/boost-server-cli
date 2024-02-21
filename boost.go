@@ -1,18 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/blang/semver"
+	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
 
 const VERSION = "0.0.1"
@@ -48,28 +49,39 @@ var options = []Option{
 }
 
 func checkForUpdate() {
-	var resonseJson map[string]interface{}
+	var latest *selfupdate.Release
+	var found bool
+	var err error
+	currentVersion := semver.MustParse(VERSION)
 	spinner.New().Title("Checking for update...").Action(func() {
-		resp, err := exec.Command("curl", "-s", "https://api.github.com/repos/henrygd/bigger-picture/releases/latest").Output()
-		checkError(err, "Failed to check for update.")
-		err = json.Unmarshal(resp, &resonseJson)
-		checkError(err, "Failed to check for update.")
+		latest, found, err = selfupdate.DetectLatest("BOOST-Creative/boost-server-cli")
 	}).Run()
+	checkError(err, "Failed to check for updates.")
 
-	latestVersion := resonseJson["name"].(string)
-	if latestVersion == VERSION {
+	if !found || latest.Version.LTE(currentVersion) {
 		return
 	}
-	// printInBox(fmt.Sprintf("Update available! %s → %s", VERSION, latestVersion))
-	spinner.New().Title("Updating to version " + latestVersion + "...").Action(func() {
-		time.Sleep(1_000_000_000)
-	}).Run()
+
+	printInBox(fmt.Sprintf("Update available: %s -> %s", VERSION, latest.Version))
+	getSudo()
+
+	var exe string
+	spinner.New().Title("Updating...").Action(func() {
+		exe, err = os.Executable()
+		checkError(err, "Could not locate executable path")
+		err = selfupdate.UpdateTo(latest.AssetURL, exe)
+	})
+	if err != nil {
+		checkError(err, "Error occurred while updating binary: "+err.Error())
+	}
+
+	printInBox(fmt.Sprintf("Successfully updated: %s -> %s\n\nRelease note:\n%s", VERSION, latest.Version, strings.TrimSpace(latest.ReleaseNotes)))
+
+	os.Exit(0)
 }
 
 func main() {
 	checkForUpdate()
-
-	// return
 
 	// Add options to the lists
 	for _, opt := range options {
@@ -80,7 +92,6 @@ func main() {
 	}
 
 	form := huh.NewForm(
-
 		// Ask the user what they want to do.
 		huh.NewGroup(
 			huh.NewSelect[string]().
