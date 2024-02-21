@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,14 @@ import (
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
 )
+
+const VERSION = "0.0.1"
+
+var USER = os.Getenv("USER")
+var chosenOption string
+var chosenSite string
+var allOptions []string
+var chooseSiteOptions []string
 
 type Option struct {
 	name       string
@@ -38,20 +47,29 @@ var options = []Option{
 	{"Whitelist IP", false, whitelistIp},
 }
 
-var USER = os.Getenv("USER")
-var chosenOption string
-var chosenSite string
-var allOptions []string
-var chooseSiteOptions []string
-
 func checkForUpdate() {
+	var resonseJson map[string]interface{}
 	spinner.New().Title("Checking for update...").Action(func() {
-		time.Sleep(500_000_000)
+		resp, err := exec.Command("curl", "-s", "https://api.github.com/repos/henrygd/bigger-picture/releases/latest").Output()
+		checkError(err, "Failed to check for update.")
+		err = json.Unmarshal(resp, &resonseJson)
+		checkError(err, "Failed to check for update.")
+	}).Run()
+
+	latestVersion := resonseJson["name"].(string)
+	if latestVersion == VERSION {
+		return
+	}
+	// printInBox(fmt.Sprintf("Update available! %s → %s", VERSION, latestVersion))
+	spinner.New().Title("Updating to version " + latestVersion + "...").Action(func() {
+		time.Sleep(1_000_000_000)
 	}).Run()
 }
 
 func main() {
-	// checkForUpdate()
+	checkForUpdate()
+
+	// return
 
 	// Add options to the lists
 	for _, opt := range options {
