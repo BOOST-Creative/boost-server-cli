@@ -522,10 +522,10 @@ func pruneDockerImages() {
 
 func mariadbUpgrade() {
 	// docker exec mariadb sh -c 'mysql_upgrade -uroot -p"$MYSQL_ROOT_PASSWORD"'
-	cmd := exec.Command("docker", "exec", "mariadb", "sh", "-c", `'mysql_upgrade -uroot -p"$MYSQL_ROOT_PASSWORD"'`)
+	cmd := exec.Command("docker", "exec", "mariadb", "sh", "-c", "mysql_upgrade -uroot -p\"$MYSQL_ROOT_PASSWORD\"")
 	output, err := cmd.CombinedOutput()
 	checkError(err, string(output))
-	printInBox(fmt.Sprintf("%s\n\nHave a fabulous day!", string(output)))
+	printInBox(fmt.Sprintf("%s\nHave a fabulous day!", string(output)))
 }
 
 func databaseSearchReplace() {
