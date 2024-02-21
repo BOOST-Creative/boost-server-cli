@@ -104,7 +104,7 @@ func main() {
 		}
 	}
 
-	printInBox("Invalid selection. Buh bye!")
+	buhBye()
 }
 
 func printInBox(content string) {
@@ -117,6 +117,12 @@ func printInBox(content string) {
 	)
 
 	fmt.Println()
+}
+
+// Exit script
+func buhBye() {
+	printInBox("Buh bye!")
+	os.Exit(0)
 }
 
 func checkError(err error, msg string) {
@@ -390,6 +396,10 @@ func addSSHKey() {
 		}).
 		Value(&key).
 		Run()
+
+	if key == "" {
+		buhBye()
+	}
 
 	err := AppendToFile("/home/"+USER+"/.ssh/authorized_keys", key)
 	if err != nil {
