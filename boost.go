@@ -16,7 +16,7 @@ import (
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
 
-const VERSION = "0.0.4"
+const VERSION = "0.0.5"
 
 var USER = os.Getenv("USER")
 var chosenOption string
