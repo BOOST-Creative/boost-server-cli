@@ -16,7 +16,7 @@ import (
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
 
-const VERSION = "0.0.2"
+const VERSION = "0.0.3"
 
 var USER = os.Getenv("USER")
 var chosenOption string
@@ -36,7 +36,7 @@ var options = []Option{
 	{"Create Site", false, createSite},
 	{"Delete Site & Files", true, deleteSite},
 	{"Restart Site", true, restartSite},
-	{"Change Site Domain", true, changeSiteDomain},
+	{"Change Domain / SSL", true, changeSiteDomain},
 	{"Container Shell", true, containerShell},
 	{"Fix Permissions", true, fixPermissions},
 	{"Database Search Replace", true, databaseSearchReplace},
@@ -80,6 +80,8 @@ func checkForUpdate() {
 
 func main() {
 	checkForUpdate()
+	// reset cursor to beginning of line
+	fmt.Print("\033[0G")
 
 	// Add options to the lists
 	for _, opt := range options {
@@ -224,14 +226,10 @@ func createSite() {
 
 			huh.NewConfirm().
 				Title("Requires PHP 7").
-				Affirmative("Yes").
-				Negative("Hell nah").
 				Value(&php7),
 
 			huh.NewConfirm().
 				Title("Create database").
-				Affirmative("Yes").
-				Negative("No").
 				Value(&createDb),
 		),
 	)
@@ -379,34 +377,34 @@ func fixPermissions() {
 
 func deleteSite() {
 	// TODO: delete database
-	var confirm bool
+	confirm := false
 	huh.NewConfirm().
-		Title("Are you sure?").
-		Description("Seriously, this will completely delete " + chosenSite + ".").
-		Affirmative("Yes").
-		Negative("No!").
+		Title(fmt.Sprintf("Are you sure you want to delete %s?", chosenSite)).
+		Description("This will COMPLETELY DELETE " + chosenSite + ".").
 		Value(&confirm).
 		Run()
 
-	if confirm {
-		getSudo()
-		spinner.New().Title("Deleting site...").Action(func() {
-			db_name := strings.ReplaceAll(chosenSite, "-", "_")
-			// drop database
-			output, err := exec.Command("docker", "exec", "-e", "DB_NAME="+db_name, "mariadb", "bash", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"DROP DATABASE $DB_NAME;\"").CombinedOutput()
-			checkError(err, string(output))
-			// stop and remove containers
-			output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").CombinedOutput()
-			checkError(err, string(output))
-			output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "rm").CombinedOutput()
-			checkError(err, string(output))
-			// remove site folder
-			output, err = exec.Command("sudo", "rm", "-r", "/home/"+USER+"/sites/"+chosenSite).CombinedOutput()
-			checkError(err, string(output))
-		}).Run()
-
-		printInBox("Deleted " + chosenSite)
+	if !confirm {
+		buhBye()
 	}
+
+	getSudo()
+	spinner.New().Title("Deleting site...").Action(func() {
+		db_name := strings.ReplaceAll(chosenSite, "-", "_")
+		// drop database
+		output, err := exec.Command("docker", "exec", "-e", "DB_NAME="+db_name, "mariadb", "bash", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"DROP DATABASE $DB_NAME;\"").CombinedOutput()
+		checkError(err, string(output))
+		// stop and remove containers
+		output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "stop").CombinedOutput()
+		checkError(err, string(output))
+		output, err = exec.Command("docker", "compose", "-f", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml", "rm").CombinedOutput()
+		checkError(err, string(output))
+		// remove site folder
+		output, err = exec.Command("sudo", "rm", "-r", "/home/"+USER+"/sites/"+chosenSite).CombinedOutput()
+		checkError(err, string(output))
+	}).Run()
+
+	printInBox("Deleted " + chosenSite)
 
 }
 
@@ -468,16 +466,18 @@ func unbanIp() {
 		Value(&ip).
 		Run()
 
-	script := fmt.Sprintf(`
-		JAILS=$(docker exec fail2ban sh -c "fail2ban-client status | grep 'Jail list'" | sed -E 's/^[^:]+:[ \t]+//' | sed 's/,//g');
-		for JAIL in $JAILS
-		do
-			docker exec fail2ban sh -c "fail2ban-client set $JAIL unbanip %s"
-		done
-	`, ip)
-	cmd := exec.Command(script)
-	output, err := cmd.CombinedOutput()
-	checkError(err, string(output))
+	spinner.New().Title("Unbanning IP...").Action(func() {
+		// docker exec fail2ban sh -c "fail2ban-client status | grep 'Jail list'" | sed -E 's/^[^:]+:[ \t]+//' | sed 's/,//g'
+		jails, err := exec.Command("docker", "exec", "fail2ban", "sh", "-c", "fail2ban-client status | grep 'Jail list' | sed -E 's/^[^:]+:[ \t]+//' | sed 's/,//g'").Output()
+		checkError(err, string(jails))
+		jailsSlice := strings.Fields(string(jails))
+
+		for _, part := range jailsSlice {
+			err = exec.Command("docker", "exec", "fail2ban", "sh", "-c", fmt.Sprintf("fail2ban-client set %s unbanip %s", part, ip)).Run()
+			checkError(err, "Error unbanning IP address")
+		}
+	}).Run()
+
 	printInBox(fmt.Sprintf("Unbanned %s. Don't forget to whitelist and have a super day!", ip))
 }
 
@@ -517,7 +517,7 @@ func pruneDockerImages() {
 		output, err = cmd.CombinedOutput()
 		checkError(err, string(output))
 	}).Run()
-	printInBox(fmt.Sprintf("Pruned docker images. Have a super day!\n%s", strings.Split(string(output), "\n")[1]))
+	printInBox(fmt.Sprintf("%s\nPruned docker images. Have a super day!", string(output)))
 }
 
 func mariadbUpgrade() {
@@ -573,7 +573,7 @@ func changeSiteDomain() {
 	checkError(err, string(output))
 
 	var newDomain string
-	var generateSSL bool
+	useSelfSigned := true
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -594,24 +594,28 @@ func changeSiteDomain() {
 
 			huh.NewConfirm().
 				Title("SSL Certificate").
-				Description("If proxying through Cloudflare, use self-signed and CF setting for strict SSL.").
-				Affirmative("Let's Encrypt / ZeroSSL").
-				Negative("Self-Signed").
-				Value(&generateSSL),
+				Description("DNS must point to this server to generate.\nIf proxying through Cloudflare, use self-signed and CF setting for strict SSL.").
+				Affirmative("Self-Signed").
+				Negative("Generate SSL").
+				Value(&useSelfSigned),
 		),
 	)
 	form.Run()
 
+	if newDomain == "" {
+		buhBye()
+	}
+
 	spinner.New().Title("Changing domain...").Action(func() {
 		// update caddy tls option
-		if generateSSL {
-			// yq -i 'del(.services.wordpress.labels."caddy.tls")' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
-			cmd := exec.Command("yq", "-i", "del(.services.wordpress.labels.\"caddy.tls\")", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml")
+		if useSelfSigned {
+			// yq -i '.services.wordpress.labels."caddy.tls" = "internal"' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
+			cmd := exec.Command("yq", "-i", ".services.wordpress.labels.\"caddy.tls\" = \"internal\"", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml")
 			output, err := cmd.CombinedOutput()
 			checkError(err, string(output))
 		} else {
-			// yq -i '.services.wordpress.labels."caddy.tls" = "internal"' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
-			cmd := exec.Command("yq", "-i", ".services.wordpress.labels.\"caddy.tls\" = \"internal\"", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml")
+			// yq -i 'del(.services.wordpress.labels."caddy.tls")' "/home/$CUR_USER/sites/$sitename/docker-compose.yml"
+			cmd := exec.Command("yq", "-i", "del(.services.wordpress.labels.\"caddy.tls\")", "/home/"+USER+"/sites/"+chosenSite+"/docker-compose.yml")
 			output, err := cmd.CombinedOutput()
 			checkError(err, string(output))
 		}
