@@ -40,7 +40,9 @@ var options = []Option{
 	{"Container Shell", true, containerShell},
 	{"Fix Permissions", true, fixPermissions},
 	{"Database Search Replace", true, databaseSearchReplace},
+	{"Migrate Files", true, migrateFiles},
 	{"Add SSH Key", false, addSSHKey},
+	{"Generate / View SSH Key", false, generateSshKey},
 	{"Prune Docker Images", false, pruneDockerImages},
 	{"MariaDB Upgrade", false, mariadbUpgrade},
 	{"Fail2ban Status", false, fail2banStatus},
@@ -64,11 +66,11 @@ func checkForUpdate() {
 
 	printInBox(fmt.Sprintf("Update available: %s -> %s", VERSION, latest.Version))
 
-	var exe string
+	var binaryPath string
 	spinner.New().Title(fmt.Sprintf("Updating to %s...", latest.Version)).Action(func() {
-		exe, err = os.Executable()
+		binaryPath, err = os.Executable()
 		checkError(err, "Could not locate executable path")
-		err = selfupdate.UpdateTo(latest.AssetURL, exe)
+		err = selfupdate.UpdateTo(latest.AssetURL, binaryPath)
 	}).Run()
 	if err != nil {
 		checkError(err, "Error occurred while updating binary:\n\n"+err.Error()+"\n\nIf the error is permission based, try running with sudo.")
@@ -151,6 +153,13 @@ func printInBox(content string) {
 func buhBye() {
 	printInBox("Buh bye!")
 	os.Exit(0)
+}
+
+func mustBeRoot() {
+	if os.Geteuid() != 0 {
+		printInBox("You must be root to do this!\n\nPlease run `sudo boost`")
+		os.Exit(0)
+	}
 }
 
 func checkError(err error, msg string) {
@@ -244,7 +253,7 @@ func createSite() {
 	var db_user string
 	var db_pass string
 
-	repo_base := "https://raw.githubusercontent.com/BOOST-Creative/docker-server-setup-caddy/main"
+	const repo_base = "https://raw.githubusercontent.com/BOOST-Creative/docker-server-setup-caddy/main"
 
 	type Download struct {
 		source string
@@ -634,5 +643,46 @@ func changeSiteDomain() {
 	checkError(err, string(output))
 
 	printInBox("Domain updated. Have a tubular day!")
+
+}
+
+func generateSshKey() {
+	mustBeRoot()
+
+	const file = "/root/.ssh/id_ed25519"
+
+	printKey := func() {
+		publicKey, _ := os.ReadFile(file + ".pub")
+		trimmedKey := strings.TrimSpace(string(publicKey))
+		msg := fmt.Sprintf("Public key:\n\n%s", trimmedKey)
+		err := clipboard.WriteAll(trimmedKey)
+		if err == nil {
+			msg += "\n\nCopied to clipboard!"
+		}
+		printInBox(msg)
+	}
+
+	// check if file exists and print pub key it if it does
+	if _, err := os.Stat(file); err == nil {
+		printKey()
+		return
+	}
+
+	var passphrase string
+	huh.NewInput().
+		Title("Enter passphrase").
+		Password(true).
+		Value(&passphrase).
+		Run()
+
+	err := exec.Command("ssh-keygen", "-t", "ed25519", "-N", passphrase, "-f", file).Run()
+	checkError(err, "Failed to create SSH key.")
+
+	printKey()
+}
+
+func migrateFiles() {
+	mustBeRoot()
+	printInBox("Migrating files...")
 
 }
