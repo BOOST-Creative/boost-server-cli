@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -140,4 +142,30 @@ func ReplaceTextInFile(filePath, oldText, newText string) error {
 	}
 
 	return nil
+}
+
+func GetHostsFromSSHConfig(configPath string, sudo bool) ([]string, error) {
+	var content []byte
+	var err error
+	if sudo {
+		content, err = exec.Command("sudo", "cat", configPath).Output()
+	} else {
+		content, err = os.ReadFile(configPath)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Define a regular expression to match Host entries in the SSH config file
+	re := regexp.MustCompile(`Host\s([a-zA-Z0-9\.\-]+)`)
+	var hosts []string
+
+	// Search for matches in the content
+	matches := re.FindAllStringSubmatch(string(content), -1)
+
+	for _, match := range matches {
+		hosts = append(hosts, match[1])
+	}
+
+	return hosts, nil
 }

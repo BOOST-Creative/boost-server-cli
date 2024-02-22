@@ -155,13 +155,6 @@ func buhBye() {
 	os.Exit(0)
 }
 
-func mustBeRoot() {
-	if os.Geteuid() != 0 {
-		printInBox("You must be root to do this!\n\nPlease run `sudo boost`")
-		os.Exit(0)
-	}
-}
-
 func checkError(err error, msg string) {
 	if err != nil {
 		printInBox(fmt.Sprintf("Command failed with error:\n\n%s", strings.TrimSpace(msg)))
@@ -363,24 +356,24 @@ func restartSite() {
 
 func fixPermissions() {
 	getSudo()
-
 	// spinner
-	spinner.New().Title(fmt.Sprintf("Fixing permissions for %s...", chosenSite)).Action(func() {
-		// sudo chown -R nobody: "/home/$CUR_USER/sites/$sitename/wordpress"
-		cmd := exec.Command("sudo", "chown", "-R", "nobody:", "/home/"+USER+"/sites/"+chosenSite+"/wordpress")
-		output, err := cmd.CombinedOutput()
-		checkError(err, string(output))
-		// sudo find "/home/$CUR_USER/sites/$sitename" -type d -exec chmod 755 {} +
-		cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite, "-type", "d", "-exec", "chmod", "755", "{}", "+")
-		output, err = cmd.CombinedOutput()
-		checkError(err, string(output))
-		// sudo find "/home/$CUR_USER/sites/$sitename/wordpress" -type f -exec chmod 644 {} +
-		cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite+"/wordpress", "-type", "f", "-exec", "chmod", "644", "{}", "+")
-		output, err = cmd.CombinedOutput()
-		checkError(err, string(output))
-	}).Run()
-
+	spinner.New().Title(fmt.Sprintf("Fixing permissions for %s...", chosenSite)).Action(runFixPermissions).Run()
 	printInBox("Permissions fixed. Have a fantastic day!")
+}
+
+func runFixPermissions() {
+	// sudo chown -R nobody: "/home/$CUR_USER/sites/$sitename/wordpress"
+	cmd := exec.Command("sudo", "chown", "-R", "nobody:", "/home/"+USER+"/sites/"+chosenSite+"/wordpress")
+	output, err := cmd.CombinedOutput()
+	checkError(err, string(output))
+	// sudo find "/home/$CUR_USER/sites/$sitename" -type d -exec chmod 755 {} +
+	cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite, "-type", "d", "-exec", "chmod", "755", "{}", "+")
+	output, err = cmd.CombinedOutput()
+	checkError(err, string(output))
+	// sudo find "/home/$CUR_USER/sites/$sitename/wordpress" -type f -exec chmod 644 {} +
+	cmd = exec.Command("sudo", "find", "/home/"+USER+"/sites/"+chosenSite+"/wordpress", "-type", "f", "-exec", "chmod", "644", "{}", "+")
+	output, err = cmd.CombinedOutput()
+	checkError(err, string(output))
 }
 
 func deleteSite() {
@@ -647,12 +640,10 @@ func changeSiteDomain() {
 }
 
 func generateSshKey() {
-	mustBeRoot()
-
 	const file = "/root/.ssh/id_ed25519"
 
 	printKey := func() {
-		publicKey, _ := os.ReadFile(file + ".pub")
+		publicKey, _ := exec.Command("sudo", "cat", file+".pub").Output()
 		trimmedKey := strings.TrimSpace(string(publicKey))
 		msg := fmt.Sprintf("Public key:\n\n%s", trimmedKey)
 		err := clipboard.WriteAll(trimmedKey)
@@ -662,8 +653,8 @@ func generateSshKey() {
 		printInBox(msg)
 	}
 
-	// check if file exists and print pub key it if it does
-	if _, err := os.Stat(file); err == nil {
+	// test if file exists
+	if err := exec.Command("sudo", "test", "-s", file).Run(); err == nil {
 		printKey()
 		return
 	}
@@ -675,14 +666,72 @@ func generateSshKey() {
 		Value(&passphrase).
 		Run()
 
-	err := exec.Command("ssh-keygen", "-t", "ed25519", "-N", passphrase, "-f", file).Run()
+	err := exec.Command("sudo", "ssh-keygen", "-t", "ed25519", "-N", passphrase, "-f", file).Run()
 	checkError(err, "Failed to create SSH key.")
 
 	printKey()
 }
 
 func migrateFiles() {
-	mustBeRoot()
-	printInBox("Migrating files...")
+	hosts, err := GetHostsFromSSHConfig("/root/.ssh/config", true)
+	if err != nil || len(hosts) == 0 {
+		printInBox("No hosts found in SSH config.\n\nPlease add to /root/.ssh/config and try again.")
+		os.Exit(0)
+	}
 
+	var sourceHost string
+	var sourcePath string
+	var destination = "/home/" + USER + "/sites/" + chosenSite + "/wordpress/"
+	form := huh.NewForm(
+		huh.NewGroup(
+			// select from hosts
+			huh.NewSelect[string]().
+				Title("Select source host").
+				Options(huh.NewOptions(hosts...)...).
+				Value(&sourceHost),
+
+			// enter source path
+			huh.NewInput().
+				Title("Enter source path or file").
+				Validate(func(s string) error {
+					if s == "" || !strings.HasPrefix(s, "/") {
+						return fmt.Errorf("please enter a full path")
+					}
+					return nil
+				}).
+				Value(&sourcePath),
+		),
+	)
+	form.Run()
+
+	// make sure there's a trailing slash if the source path is not a file
+	if !strings.HasSuffix(sourcePath, "/") && !strings.Contains(sourcePath, ".") {
+		sourcePath += "/"
+	}
+
+	// confirm options
+	var confirm bool
+	huh.NewConfirm().
+		Title("Everything look good?").
+		Description(fmt.Sprintf("Source host: %s\nSource path: %s\nDestination: %s", sourceHost, sourcePath, destination)).
+		Value(&confirm).
+		Run()
+
+	if !confirm {
+		buhBye()
+	}
+
+	// rsync
+	cmd := exec.Command("sudo", "rsync", "-r", "--progress", sourceHost+":"+sourcePath, destination)
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	err = cmd.Run()
+	if err != nil {
+		checkError(err, "Error migrating files:\n\n"+err.Error())
+	}
+
+	// fix permissions
+	spinner.New().Title(fmt.Sprintf("Fixing permissions for %s...", chosenSite)).Action(runFixPermissions).Run()
+
+	printInBox("Files migrated. Have a splendid day!")
 }
