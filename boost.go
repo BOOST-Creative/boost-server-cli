@@ -11,9 +11,6 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
-
-	"github.com/blang/semver"
-	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
 
 const VERSION = "0.0.5"
@@ -21,7 +18,6 @@ const VERSION = "0.0.5"
 var USER = os.Getenv("USER")
 var chosenOption string
 var chosenSite string
-var allOptions []string
 
 type Option struct {
 	name       string
@@ -49,43 +45,19 @@ var options = []Option{
 	{"Whitelist IP", false, whitelistIp},
 }
 
-func checkForUpdate() {
-	var latest *selfupdate.Release
-	var found bool
-	var err error
-	currentVersion := semver.MustParse(VERSION)
-	spinner.New().Title("Checking for update...").Action(func() {
-		latest, found, err = selfupdate.DetectLatest("BOOST-Creative/boost-server-cli")
-	}).Run()
-	checkError(err, "Failed to check for updates.")
-
-	if !found || latest.Version.LTE(currentVersion) {
-		return
-	}
-
-	printInBox(fmt.Sprintf("Update available: %s -> %s", VERSION, latest.Version))
-
-	var binaryPath string
-	spinner.New().Title(fmt.Sprintf("Updating to %s...", latest.Version)).Action(func() {
-		binaryPath, err = os.Executable()
-		checkError(err, "Could not locate executable path")
-		err = selfupdate.UpdateTo(latest.AssetURL, binaryPath)
-	}).Run()
-	if err != nil {
-		checkError(err, "Error occurred while updating binary:\n\n"+err.Error()+"\n\nIf the error is permission based, try running with sudo.")
-	}
-	printInBox(fmt.Sprintf("Successfully updated: %s -> %s\n\nRelease note:\n%s", VERSION, latest.Version, strings.TrimSpace(latest.ReleaseNotes)))
-	os.Exit(0)
+func main() {
+	CheckForUpdate()
+	introForm()
 }
 
-func main() {
-	checkForUpdate()
+func introForm() {
 	// reset cursor to beginning of line
 	fmt.Print("\033[0G")
 
-	// Add options to the lists
-	for _, opt := range options {
-		allOptions = append(allOptions, opt.name)
+	// create list of options to use for intro form
+	allOptions := []string{}
+	for _, option := range options {
+		allOptions = append(allOptions, option.name)
 	}
 
 	form := huh.NewForm(
@@ -96,7 +68,7 @@ func main() {
 				Options(
 					huh.NewOptions(allOptions...)...,
 				).
-				Value(&chosenOption), // store the chosen option in the "burger" variable
+				Value(&chosenOption),
 		),
 
 		// Ask the user for a site.

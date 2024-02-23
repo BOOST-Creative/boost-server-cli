@@ -11,7 +11,41 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/blang/semver"
+	"github.com/charmbracelet/huh/spinner"
+	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
+
+// Check if new version is available and update + exit if it is
+func CheckForUpdate() {
+	var latest *selfupdate.Release
+	var found bool
+	var err error
+	currentVersion := semver.MustParse(VERSION)
+	spinner.New().Title("Checking for update...").Action(func() {
+		latest, found, err = selfupdate.DetectLatest("BOOST-Creative/boost-server-cli")
+	}).Run()
+	checkError(err, "Failed to check for updates.")
+
+	if !found || latest.Version.LTE(currentVersion) {
+		return
+	}
+
+	printInBox(fmt.Sprintf("Update available: %s -> %s", VERSION, latest.Version))
+
+	var binaryPath string
+	spinner.New().Title(fmt.Sprintf("Updating to %s...", latest.Version)).Action(func() {
+		binaryPath, err = os.Executable()
+		checkError(err, "Could not locate executable path")
+		err = selfupdate.UpdateTo(latest.AssetURL, binaryPath)
+	}).Run()
+	if err != nil {
+		checkError(err, "Error occurred while updating binary:\n\n"+err.Error()+"\n\nIf the error is permission based, try running with sudo.")
+	}
+	printInBox(fmt.Sprintf("Successfully updated: %s -> %s\n\nRelease note:\n%s", VERSION, latest.Version, strings.TrimSpace(latest.ReleaseNotes)))
+	os.Exit(0)
+}
 
 // GetDirectoriesInPath retrieves the list of directories in the specified path.
 //
