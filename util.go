@@ -4,12 +4,16 @@ import (
 	"bufio"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/blang/semver"
@@ -202,4 +206,33 @@ func GetHostsFromSSHConfig(configPath string, sudo bool) ([]string, error) {
 	}
 
 	return hosts, nil
+}
+
+// finds the last modified file with the specified extension in the given directory.
+func FindLastModifiedFile(dirPath string, ext string) (fs.FileInfo, error) {
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var matchedFiles []os.FileInfo
+	for _, file := range files {
+		if filepath.Ext(file.Name()) == ext {
+			info, err := file.Info()
+			if err != nil {
+				return nil, err
+			}
+			matchedFiles = append(matchedFiles, info)
+		}
+	}
+
+	if len(matchedFiles) == 0 {
+		return nil, errors.New("no .sql files found in the directory")
+	}
+
+	sort.Slice(matchedFiles, func(i, j int) bool {
+		return matchedFiles[i].ModTime().After(matchedFiles[j].ModTime())
+	})
+
+	return matchedFiles[0], nil
 }

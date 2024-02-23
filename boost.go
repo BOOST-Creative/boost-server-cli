@@ -36,6 +36,7 @@ var options = []Option{
 	{"Fix Permissions", true, fixPermissions},
 	{"Database Search Replace", true, databaseSearchReplace},
 	{"Migrate Files", true, migrateFiles},
+	{"Import WP Database", true, importWPDatabase},
 	{"Add SSH Key", false, addSSHKey},
 	{"Generate / View SSH Key", false, generateSshKey},
 	{"Prune Docker Images", false, pruneDockerImages},
@@ -702,4 +703,32 @@ func migrateFiles() {
 	spinner.New().Title(fmt.Sprintf("Fixing permissions for %s...", chosenSite)).Action(runFixPermissions).Run()
 
 	printInBox("Files migrated. Have a splendid day!")
+}
+
+// imports last modified sql file in wordpress directory
+func importWPDatabase() {
+	file, err := FindLastModifiedFile("/home/"+USER+"/sites/"+chosenSite+"/wordpress", ".sql")
+	if err != nil {
+		checkError(err, err.Error())
+	}
+
+	// ask for confirmation
+	confirm := true
+	huh.NewConfirm().
+		Title("Are you sure you want to import this database?\nThis will overwrite the current database.\n").
+		Description(fmt.Sprintf("Site: %s\nFile: %s", chosenSite, file.Name())).
+		Value(&confirm).
+		Run()
+
+	if !confirm {
+		buhBye()
+	}
+
+	var output []byte
+	spinner.New().Title(fmt.Sprintf("Importing database for %s...", chosenSite)).Action(func() {
+		cmd := exec.Command("docker", "exec", chosenSite, "sh", "-c", "cd /usr/src/wordpress && wp db import "+file.Name())
+		output, err = cmd.CombinedOutput()
+	}).Run()
+	checkError(err, string(output))
+	printInBox(fmt.Sprintf("%s\nHave a grand day!", string(output)))
 }
