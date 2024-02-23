@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const VERSION = "0.0.5"
+const VERSION = "0.0.6"
 
 var USER = os.Getenv("USER")
 var chosenOption string
