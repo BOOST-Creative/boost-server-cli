@@ -22,7 +22,6 @@ var USER = os.Getenv("USER")
 var chosenOption string
 var chosenSite string
 var allOptions []string
-var chooseSiteOptions []string
 
 type Option struct {
 	name       string
@@ -31,11 +30,11 @@ type Option struct {
 }
 
 var options = []Option{
+	{"Create Site", false, createSite},
 	{"Start Site", true, startSite},
 	{"Stop Site", true, stopSite},
-	{"Create Site", false, createSite},
-	{"Delete Site & Files", true, deleteSite},
 	{"Restart Site", true, restartSite},
+	{"Delete Site & Files", true, deleteSite},
 	{"Change Domain / SSL", true, changeSiteDomain},
 	{"Container Shell", true, containerShell},
 	{"Fix Permissions", true, fixPermissions},
@@ -87,9 +86,6 @@ func main() {
 	// Add options to the lists
 	for _, opt := range options {
 		allOptions = append(allOptions, opt.name)
-		if opt.chooseSite {
-			chooseSiteOptions = append(chooseSiteOptions, opt.name)
-		}
 	}
 
 	form := huh.NewForm(
@@ -112,9 +108,9 @@ func main() {
 				).
 				Value(&chosenSite),
 		).WithHideFunc(func() bool {
-			for _, option := range chooseSiteOptions {
-				if chosenOption == option {
-					return false
+			for _, option := range options {
+				if chosenOption == option.name {
+					return !option.chooseSite
 				}
 			}
 			return true
@@ -195,12 +191,10 @@ func stopSite() {
 }
 
 func createSite() {
-	getSudo()
-
 	var sitename string
+	var domain string
 	php7 := false
 	createDb := true
-	domain := ""
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -265,6 +259,8 @@ func createSite() {
 		source: repo_base + "/wordpress/redis.conf",
 		target: "/home/" + USER + "/sites/" + sitename + "/redis.conf",
 	}
+
+	getSudo()
 
 	// spinner
 	spinner.New().Title("Creating site...").Action(func() {
