@@ -38,6 +38,7 @@ var options = []Option{
 	{"Database Search Replace", true, databaseSearchReplace},
 	{"Import WP Database", true, importWPDatabase},
 	{"Update WP Database Config", true, changeDatabaseInfo},
+	{"Toggle WP Maintenance Mode", true, maintenanceMode},
 	{"Add SSH Key", false, addSSHKey},
 	{"Generate / View SSH Key", false, generateSshKey},
 	{"Prune Docker Images", false, pruneDockerImages},
@@ -784,4 +785,30 @@ func changeDatabaseInfo() {
 	}
 
 	printInBox("Database config updated. Have a marvelous day!")
+}
+
+func maintenanceMode() {
+	var enable bool
+	huh.NewConfirm().
+		Title("Maintenance mode for " + chosenSite).
+		Value(&enable).
+		Affirmative("Enable").
+		Negative("Disable").
+		Run()
+
+	action := "deactivate"
+	if enable {
+		action = "activate"
+	}
+
+	var output []byte
+	var err error
+	spinner.New().Title(fmt.Sprintf("Changing maintenance mode for %s...", chosenSite)).Action(func() {
+		cmd := exec.Command("docker", "exec", chosenSite, "sh", "-c", "cd /usr/src/wordpress && wp maintenance-mode "+action)
+		output, err = cmd.CombinedOutput()
+	}).Run()
+
+	checkError(err, string(output))
+	printInBox(fmt.Sprintf("%s\nHave a brilliant day!", string(output)))
+
 }
