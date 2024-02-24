@@ -34,9 +34,10 @@ var options = []Option{
 	{"Change Domain / SSL", true, changeSiteDomain},
 	{"Container Shell", true, containerShell},
 	{"Fix Permissions", true, fixPermissions},
-	{"Database Search Replace", true, databaseSearchReplace},
 	{"Migrate Files", true, migrateFiles},
+	{"Database Search Replace", true, databaseSearchReplace},
 	{"Import WP Database", true, importWPDatabase},
+	{"Update WP Database Config", true, changeDatabaseInfo},
 	{"Add SSH Key", false, addSSHKey},
 	{"Generate / View SSH Key", false, generateSshKey},
 	{"Prune Docker Images", false, pruneDockerImages},
@@ -564,7 +565,7 @@ func changeSiteDomain() {
 
 			huh.NewConfirm().
 				Title("SSL Certificate").
-				Description("DNS must point to this server to generate.\nIf proxying through Cloudflare, use self-signed and CF setting for strict SSL.").
+				Description("DNS must point to this server to generate.\nIf proxying through Cloudflare, use self-signed and CF setting for \"Full\" SSL.").
 				Affirmative("Self-Signed").
 				Negative("Generate SSL").
 				Value(&useSelfSigned),
@@ -705,7 +706,7 @@ func migrateFiles() {
 	printInBox("Files migrated. Have a splendid day!")
 }
 
-// imports last modified sql file in wordpress directory
+// imports last modified sql file in site directory
 func importWPDatabase() {
 	file, err := FindLastModifiedFile("/home/"+USER+"/sites/"+chosenSite+"/wordpress", ".sql")
 	if err != nil {
@@ -731,4 +732,56 @@ func importWPDatabase() {
 	}).Run()
 	checkError(err, string(output))
 	printInBox(fmt.Sprintf("%s\nHave a grand day!", string(output)))
+}
+
+func changeDatabaseInfo() {
+	var db_name string
+	var db_user string
+	var db_pass string
+	var db_host = "mariadb"
+
+	notEmpty := func(s string) error {
+		if s == "" {
+			return fmt.Errorf("cannot be empty")
+		}
+		return nil
+	}
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Enter database name").
+				Validate(notEmpty).
+				Value(&db_name),
+
+			huh.NewInput().
+				Title("Enter database user").
+				Validate(notEmpty).
+				Value(&db_user),
+
+			huh.NewInput().
+				Title("Enter database password").
+				Validate(notEmpty).
+				Password(true).
+				Value(&db_pass),
+
+			huh.NewInput().
+				Title("Enter database host").
+				Validate(notEmpty).
+				Value(&db_host),
+		),
+	)
+
+	form.Run()
+
+	if db_name == "" || db_user == "" || db_pass == "" || db_host == "" {
+		buhBye()
+	}
+
+	err := UpdateWpDatabaseConfig("/home/"+USER+"/sites/"+chosenSite+"/wordpress/wp-config.php", db_name, db_user, db_pass, db_host)
+	if err != nil {
+		checkError(err, err.Error())
+	}
+
+	printInBox("Database config updated. Have a marvelous day!")
 }

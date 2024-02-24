@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -235,4 +236,74 @@ func FindLastModifiedFile(dirPath string, ext string) (fs.FileInfo, error) {
 	})
 
 	return matchedFiles[0], nil
+}
+
+// updates the database configuration in the given WordPress config file.
+func UpdateWpDatabaseConfig(filename string, newDBName, newDBUser, newDBPassword, newDBHost string) error {
+	file, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("error reading file: %w", err)
+	}
+
+	// Regex patterns for matching the constants and their values
+	patterns := map[string]*regexp.Regexp{
+		"DB_NAME":     regexp.MustCompile(`define\s*\(\s*'DB_NAME',\s*'.*?'\s*\);`),
+		"DB_USER":     regexp.MustCompile(`define\s*\(\s*'DB_USER',\s*'.*?'\s*\);`),
+		"DB_PASSWORD": regexp.MustCompile(`define\s*\(\s*'DB_PASSWORD',\s*'.*?'\s*\);`),
+		"DB_HOST":     regexp.MustCompile(`define\s*\(\s*'DB_HOST',\s*'.*?'\s*\);`),
+	}
+
+	// Define the replacements map to hold new values
+	replacements := map[string]string{
+		"DB_NAME":     newDBName,
+		"DB_USER":     newDBUser,
+		"DB_PASSWORD": newDBPassword,
+		"DB_HOST":     newDBHost,
+	}
+
+	var updatedLines []string
+	scanner := bufio.NewScanner(bytes.NewReader(file))
+	for scanner.Scan() {
+		line := scanner.Text()
+		for name, pattern := range patterns {
+			if pattern.MatchString(line) {
+				line = fmt.Sprintf(`define('%s', '%s');`, name, replacements[name])
+				break
+			}
+		}
+		updatedLines = append(updatedLines, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error scanning file: %w", err)
+	}
+
+	// store current permission
+	cmd := exec.Command("stat", "-c", "%a", filename)
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("error getting permission: %w", err)
+	}
+	perm := strings.TrimSpace(string(out))
+
+	// set write permission with sudo
+	cmd = exec.Command("sudo", "chmod", "666", filename)
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error setting write permission: %w", err)
+	}
+
+	err = os.WriteFile(filename, []byte(strings.Join(updatedLines, "\n")+"\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing file: %w", err)
+	}
+
+	// restore permission
+	cmd = exec.Command("sudo", "chmod", perm, filename)
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error restoring permission: %w", err)
+	}
+
+	return nil
 }
