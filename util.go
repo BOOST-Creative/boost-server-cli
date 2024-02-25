@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -238,48 +237,35 @@ func FindLastModifiedFile(dirPath string, ext string) (fs.FileInfo, error) {
 	return matchedFiles[0], nil
 }
 
-// updates the database configuration in the given WordPress config file.
-func UpdateWpDatabaseConfig(filename string, newDBName, newDBUser, newDBPassword, newDBHost string) error {
-	file, err := os.ReadFile(filename)
+// update constant values in a php file
+func UpdateDefineValues(filePath string, updates map[string]string) error {
+	fileData, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("error reading file: %w", err)
 	}
 
-	// Regex patterns for matching the constants and their values
-	patterns := map[string]*regexp.Regexp{
-		"DB_NAME":     regexp.MustCompile(`define\s*\(\s*'DB_NAME',\s*'.*?'\s*\);`),
-		"DB_USER":     regexp.MustCompile(`define\s*\(\s*'DB_USER',\s*'.*?'\s*\);`),
-		"DB_PASSWORD": regexp.MustCompile(`define\s*\(\s*'DB_PASSWORD',\s*'.*?'\s*\);`),
-		"DB_HOST":     regexp.MustCompile(`define\s*\(\s*'DB_HOST',\s*'.*?'\s*\);`),
+	if err != nil {
+		return err
 	}
 
-	// Define the replacements map to hold new values
-	replacements := map[string]string{
-		"DB_NAME":     newDBName,
-		"DB_USER":     newDBUser,
-		"DB_PASSWORD": newDBPassword,
-		"DB_HOST":     newDBHost,
-	}
+	// Regular expression to match any define variation
+	re := regexp.MustCompile(`define\s*\(\s*['"](?P<key>[^'\"]+)['"]\s*,\s*['"](?P<value>[^'\"]+)['"]\s*\);`)
 
-	var updatedLines []string
-	scanner := bufio.NewScanner(bytes.NewReader(file))
-	for scanner.Scan() {
-		line := scanner.Text()
-		for name, pattern := range patterns {
-			if pattern.MatchString(line) {
-				line = fmt.Sprintf(`define('%s', '%s');`, name, replacements[name])
-				break
+	// Replace all matches and create new data
+	newData := re.ReplaceAllStringFunc(string(fileData), func(match string) string {
+		matches := re.FindStringSubmatch(match)
+		if len(matches) > 2 {
+			fmt.Println("key:", matches[1], "value:", matches[2])
+			key := matches[1]
+			if newValue, ok := updates[key]; ok {
+				return fmt.Sprintf("define('%s', '%s');", key, newValue)
 			}
 		}
-		updatedLines = append(updatedLines, line)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error scanning file: %w", err)
-	}
+		return match // No match or no update for key, return original string
+	})
 
 	// store current permission
-	cmd := exec.Command("stat", "-c", "%a", filename)
+	cmd := exec.Command("stat", "-c", "%a", filePath)
 	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("error getting permission: %w", err)
@@ -287,19 +273,20 @@ func UpdateWpDatabaseConfig(filename string, newDBName, newDBUser, newDBPassword
 	perm := strings.TrimSpace(string(out))
 
 	// set write permission with sudo
-	cmd = exec.Command("sudo", "chmod", "666", filename)
+	cmd = exec.Command("sudo", "chmod", "666", filePath)
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error setting write permission: %w", err)
 	}
 
-	err = os.WriteFile(filename, []byte(strings.Join(updatedLines, "\n")+"\n"), 0644)
+	// Write back the modified data to the file
+	err = os.WriteFile(filePath, []byte(newData), 0644)
 	if err != nil {
-		return fmt.Errorf("error writing file: %w", err)
+		return err
 	}
 
 	// restore permission
-	cmd = exec.Command("sudo", "chmod", perm, filename)
+	cmd = exec.Command("sudo", "chmod", perm, filePath)
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error restoring permission: %w", err)

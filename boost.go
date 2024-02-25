@@ -58,7 +58,7 @@ func introForm() {
 	fmt.Print("\033[0G")
 
 	// create list of options to use for intro form
-	allOptions := []string{}
+	allOptions := make([]string, 0, len(options))
 	for _, option := range options {
 		allOptions = append(allOptions, option.name)
 	}
@@ -546,6 +546,10 @@ func databaseSearchReplace() {
 	)
 	form.Run()
 
+	if search == "" || replace == "" {
+		buhBye()
+	}
+
 	var output []byte
 	var err error
 	spinner.New().Title("Searching and replacing...").Action(func() {
@@ -798,7 +802,15 @@ func changeDatabaseInfo() {
 		buhBye()
 	}
 
-	err := UpdateWpDatabaseConfig("/home/"+USER+"/sites/"+chosenSite+"/wordpress/wp-config.php", db_name, db_user, db_pass, db_host)
+	filePath := "/home/" + USER + "/sites/" + chosenSite + "/wordpress/wp-config.php"
+	updates := map[string]string{
+		"DB_NAME":     db_name,
+		"DB_USER":     db_user,
+		"DB_PASSWORD": db_pass,
+		"DB_HOST":     db_host,
+	}
+
+	err := UpdateDefineValues(filePath, updates)
 	if err != nil {
 		checkError(err, err.Error())
 	}
