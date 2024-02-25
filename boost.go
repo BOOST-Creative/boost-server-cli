@@ -546,9 +546,13 @@ func databaseSearchReplace() {
 	)
 	form.Run()
 
-	// docker exec "$sitename" sh -c "cd /usr/src/wordpress && wp search-replace '$searchstring' '$replacestring' --all-tables"
-	cmd := exec.Command("docker", "exec", chosenSite, "sh", "-c", fmt.Sprintf("cd /usr/src/wordpress && wp search-replace '%s' '%s' --all-tables", search, replace))
-	output, err := cmd.CombinedOutput()
+	var output []byte
+	var err error
+	spinner.New().Title("Searching and replacing...").Action(func() {
+		cmd := exec.Command("docker", "exec", chosenSite, "sh", "-c", fmt.Sprintf("cd /usr/src/wordpress && wp search-replace '%s' '%s' --all-tables", search, replace))
+		output, err = cmd.CombinedOutput()
+	}).Run()
+
 	checkError(err, string(output))
 	printInBox(fmt.Sprintf("%s\n\nHave a radical day!", string(output)))
 }
