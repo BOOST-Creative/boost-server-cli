@@ -240,9 +240,6 @@ func FindLastModifiedFile(dirPath string, ext string) (fs.FileInfo, error) {
 // update constant values in a php file
 func UpdateDefineValues(filePath string, updates map[string]string) error {
 	fileData, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("error reading file: %w", err)
-	}
 
 	if err != nil {
 		return err
@@ -255,7 +252,7 @@ func UpdateDefineValues(filePath string, updates map[string]string) error {
 	newData := re.ReplaceAllStringFunc(string(fileData), func(match string) string {
 		matches := re.FindStringSubmatch(match)
 		if len(matches) > 2 {
-			fmt.Println("key:", matches[1], "value:", matches[2])
+			// fmt.Println("key:", matches[1], "value:", matches[2])
 			key := matches[1]
 			if newValue, ok := updates[key]; ok {
 				return fmt.Sprintf("define('%s', '%s');", key, newValue)
