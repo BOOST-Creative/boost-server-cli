@@ -11,9 +11,13 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/load"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
-const VERSION = "0.0.8"
+const VERSION = "0.0.9"
 
 var USER = os.Getenv("USER")
 var chosenOption string
@@ -39,6 +43,7 @@ var options = []Option{
 	{"Import WP Database", true, importWPDatabase},
 	{"Update WP Database Config", true, changeDatabaseInfo},
 	{"Toggle WP Maintenance Mode", true, maintenanceMode},
+	{"Server Status", false, serverStatus},
 	{"Add SSH Key", false, addSSHKey},
 	{"Generate / View SSH Key", false, generateSshKey},
 	{"Prune Docker Images", false, pruneDockerImages},
@@ -842,4 +847,58 @@ func maintenanceMode() {
 	checkError(err, string(output))
 	printInBox(fmt.Sprintf("%s\nHave a brilliant day!", string(output)))
 
+}
+
+func serverStatus() {
+	convertToGigabytes := func(v float64) string {
+		return fmt.Sprintf("%.2f GB", v/1024/1024/1024)
+	}
+
+	renderStatusPercentage := func(v float64, levels [2]float64) string {
+		style := lipgloss.NewStyle()
+		colors := map[string]string{
+			"red":    "160",
+			"green":  "42",
+			"yellow": "220",
+		}
+		color := "green"
+		switch {
+		case v > levels[1]:
+			color = "red"
+		case v > levels[0]:
+			color = "yellow"
+		}
+		return style.Foreground(lipgloss.Color(colors[color])).Render(fmt.Sprintf("%.2f%%", v))
+	}
+
+	coreCount, _ := cpu.Counts(false)
+	loadAvg, _ := load.Avg()
+	virtualMemory, _ := mem.VirtualMemory()
+	usage, _ := disk.Usage("/")
+
+	capacity := float64(coreCount) * 0.25
+	percentCapacity := loadAvg.Load15 / capacity * 100
+
+	var sb strings.Builder
+	headingStyle := lipgloss.NewStyle().Bold(true).MarginBottom(1).Foreground(lipgloss.Color("63"))
+
+	fmt.Fprint(&sb, headingStyle.Render("CPU"))
+
+	fmt.Fprintln(&sb, "\nCores:   ", coreCount)
+	fmt.Fprintln(&sb, "Load Avg:", fmt.Sprintf("%.2f, %.2f, %.2f", loadAvg.Load1, loadAvg.Load5, loadAvg.Load15))
+	fmt.Fprintln(&sb, "Capacity:", renderStatusPercentage(percentCapacity, [2]float64{60, 100}))
+
+	fmt.Fprint(&sb, headingStyle.MarginTop(1).Render("Memory"))
+
+	fmt.Fprintln(&sb, "\nUsed:    ", convertToGigabytes(float64(virtualMemory.Used)))
+	fmt.Fprintln(&sb, "Free:    ", convertToGigabytes(float64(virtualMemory.Free)))
+	fmt.Fprintln(&sb, "Percent: ", renderStatusPercentage(virtualMemory.UsedPercent, [2]float64{60, 80}))
+
+	fmt.Fprint(&sb, headingStyle.MarginTop(1).Render("Disk"))
+
+	fmt.Fprintln(&sb, "\nUsed:    ", convertToGigabytes(float64(usage.Used)))
+	fmt.Fprintln(&sb, "Free:    ", convertToGigabytes(float64(usage.Free)))
+	fmt.Fprintln(&sb, "Percent: ", renderStatusPercentage(usage.UsedPercent, [2]float64{60, 75}))
+
+	printInBox(strings.TrimSpace(sb.String()))
 }
