@@ -17,7 +17,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
-const VERSION = "0.0.9"
+const VERSION = "0.0.10"
 
 var USER = os.Getenv("USER")
 var chosenOption string
@@ -871,7 +871,7 @@ func serverStatus() {
 		return style.Foreground(lipgloss.Color(colors[color])).Render(fmt.Sprintf("%.2f%%", v))
 	}
 
-	coreCount, _ := cpu.Counts(false)
+	coreCount, _ := cpu.Counts(true)
 	loadAvg, _ := load.Avg()
 	virtualMemory, _ := mem.VirtualMemory()
 	usage, _ := disk.Usage("/")
@@ -886,18 +886,21 @@ func serverStatus() {
 
 	fmt.Fprintln(&sb, "\nCores:   ", coreCount)
 	fmt.Fprintln(&sb, "Load Avg:", fmt.Sprintf("%.2f, %.2f, %.2f", loadAvg.Load1, loadAvg.Load5, loadAvg.Load15))
-	fmt.Fprintln(&sb, "Capacity:", renderStatusPercentage(percentCapacity, [2]float64{60, 100}))
+	fmt.Fprintln(&sb, "Capacity:", renderStatusPercentage(percentCapacity, [2]float64{70, 100}))
 
 	fmt.Fprint(&sb, headingStyle.MarginTop(1).Render("Memory"))
 
-	fmt.Fprintln(&sb, "\nUsed:    ", convertToGigabytes(float64(virtualMemory.Used)))
-	fmt.Fprintln(&sb, "Free:    ", convertToGigabytes(float64(virtualMemory.Free)))
-	fmt.Fprintln(&sb, "Percent: ", renderStatusPercentage(virtualMemory.UsedPercent, [2]float64{60, 80}))
+	memoryTotal := float64(virtualMemory.Total)
+	memoryUsed := memoryTotal - float64(virtualMemory.Available)
+	percentUsed := memoryUsed / memoryTotal * 100
+	fmt.Fprintln(&sb, "\nUsed:    ", convertToGigabytes(memoryUsed))
+	fmt.Fprintln(&sb, "Total:   ", convertToGigabytes(memoryTotal))
+	fmt.Fprintln(&sb, "Percent: ", renderStatusPercentage(percentUsed, [2]float64{60, 80}))
 
 	fmt.Fprint(&sb, headingStyle.MarginTop(1).Render("Disk"))
 
 	fmt.Fprintln(&sb, "\nUsed:    ", convertToGigabytes(float64(usage.Used)))
-	fmt.Fprintln(&sb, "Free:    ", convertToGigabytes(float64(usage.Free)))
+	fmt.Fprintln(&sb, "Total:   ", convertToGigabytes(float64(usage.Total)))
 	fmt.Fprintln(&sb, "Percent: ", renderStatusPercentage(usage.UsedPercent, [2]float64{60, 75}))
 
 	printInBox(strings.TrimSpace(sb.String()))
