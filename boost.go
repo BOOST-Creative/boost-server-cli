@@ -174,7 +174,6 @@ func createSite() {
 	var sitename string
 	var domain string
 	php7 := false
-	cloudflare := false
 	createDb := true
 
 	form := huh.NewForm(
@@ -203,10 +202,6 @@ func createSite() {
 			huh.NewConfirm().
 				Title("Requires PHP 7").
 				Value(&php7),
-
-			huh.NewConfirm().
-				Title("Proxied through Cloudflare").
-				Value(&cloudflare),
 
 			huh.NewConfirm().
 				Title("Create database").
@@ -261,15 +256,6 @@ func createSite() {
 		// replace stuff in wordpress docker compose
 		if php7 {
 			ReplaceTextInFile(wordpressCompose.target, "docker-wordpress-8", "docker-wordpress-7")
-		}
-		if cloudflare {
-			// swap plugins if proxying through cloudflare
-			cmd := exec.Command("yq", "-i", ".services.wordpress.environment.ADDITIONAL_PLUGINS = \"w3-total-cache better-wp-security\"", wordpressCompose.target)
-			output, err := cmd.CombinedOutput()
-			checkError(err, string(output))
-			// comment out fail2ban volume mount
-			f2bMount := "- /home/CHANGE_TO_USERNAME/server/wp-fail2ban"
-			ReplaceTextInFile(wordpressCompose.target, f2bMount, "# "+f2bMount)
 		}
 		ReplaceTextInFile(wordpressCompose.target, "CHANGE_TO_SITE_NAME", sitename)
 		ReplaceTextInFile(wordpressCompose.target, "CHANGE_TO_USERNAME", USER)
