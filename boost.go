@@ -707,7 +707,7 @@ func migrateFiles() {
 	}
 
 	// rsync
-	cmd := exec.Command("sudo", "rsync", "-r", "--progress", sourceHost+":"+sourcePath, destination)
+	cmd := exec.Command("sudo", "rsync", "-rtp", "--progress", sourceHost+":"+sourcePath, destination)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	err = cmd.Run()
