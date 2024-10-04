@@ -39,6 +39,7 @@ var options = []Option{
 	{"Container Shell", true, containerShell},
 	{"Fix Permissions", true, fixPermissions},
 	{"Migrate Files", true, migrateFiles},
+	{"Optimize Images", true, optimizeImages},
 	{"Database Search Replace", true, databaseSearchReplace},
 	{"Import WP Database", true, importWPDatabase},
 	{"Update WP Database Config", true, changeDatabaseInfo},
@@ -719,6 +720,30 @@ func migrateFiles() {
 	spinner.New().Title(fmt.Sprintf("Fixing permissions for %s...", chosenSite)).Action(runFixPermissions).Run()
 
 	printInBox("Files migrated. Have a splendid day!")
+}
+
+func optimizeImages() {
+	var dir = "/home/" + USER + "/sites/" + chosenSite
+	// confirm options
+	var confirm bool
+	huh.NewConfirm().
+		Title(fmt.Sprintf("Optimize images in %s?", dir)).
+		Description("This only needs to be done immediately after migration if images are unoptimized. New images are optimized automatically.").
+		Value(&confirm).
+		Run()
+
+	if !confirm {
+		buhBye()
+	}
+
+	// rsync
+	cmd := exec.Command("sudo", "docker", "run", "--rm", "-v", dir+":/images", "-v", "/root/image-backups/"+chosenSite+":/backup", "-e", "MIN_SIZE=900", "-e", "MAX_HEIGHT=2500", "-e", "MAX_WIDTH=2500", "henrygd/optimize")
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	err := cmd.Run()
+	if err != nil {
+		checkError(err, "Error optimizing images:\n\n"+err.Error())
+	}
 }
 
 // imports last modified sql file in site directory
