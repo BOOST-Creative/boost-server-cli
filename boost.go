@@ -737,7 +737,7 @@ func optimizeImages() {
 	}
 
 	// rsync
-	cmd := exec.Command("sudo", "docker", "run", "--rm", "-v", dir+":/images", "-v", "/root/image-backups/"+chosenSite+":/backup", "-e", "MIN_SIZE=900", "-e", "MAX_HEIGHT=2500", "-e", "MAX_WIDTH=2500", "henrygd/optimize")
+	cmd := exec.Command("sudo", "docker", "run", "--rm", "-v", dir+":/images", "-v", "/root/image-backups/"+chosenSite+":/backup", "-e", "MIN_SIZE=900", "-e", "MAX_HEIGHT=2500", "-e", "MAX_WIDTH=2500", "-e", "JOBS=2", "henrygd/optimize")
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	err := cmd.Run()
