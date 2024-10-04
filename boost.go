@@ -17,7 +17,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
-const VERSION = "0.0.11"
+const VERSION = "0.0.12"
 
 var USER = os.Getenv("USER")
 var chosenOption string
